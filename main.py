@@ -2,7 +2,7 @@ import streamlit as st
 import pickle
 import pandas as pd
 import requests
-<<<<<<< HEAD
+
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import json
@@ -12,8 +12,7 @@ import urllib.request
 import pickle
 import requests
 from datetime import date, datetime
-=======
->>>>>>> 1d9f45bab07eda5c2b32d352fdbd2364afa2483c
+
 
 
 
@@ -67,7 +66,7 @@ def rating(movie_id):
     data = response.json()
     return data['vote_average']
 
-<<<<<<< HEAD
+
 def review(movie_id):
     response = requests.get("https://api.themoviedb.org/3/movie/{}/reviews?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US&page=1".format(movie_id))
     data = response.json()
@@ -102,8 +101,8 @@ def trailer(movie_id):
     response = requests.get("https://api.themoviedb.org/3/movie/{}/videos?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(movie_id))
     data = response.json()
     return data['results'][0]['key']
-=======
->>>>>>> 1d9f45bab07eda5c2b32d352fdbd2364afa2483c
+
+
 
 def recommend(movie):
     movie_index = movies[movies['title'] == movie].index[0]
@@ -118,34 +117,30 @@ def recommend(movie):
     overview_final = overview(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
     rel_date = date(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
     ratings = rating(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-<<<<<<< HEAD
+
     re4view = get_reviews(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
     rev = review(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
     trailer_final = trailer(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-=======
->>>>>>> 1d9f45bab07eda5c2b32d352fdbd2364afa2483c
+
     for i in recommended_movies:
 
         final.append(movies.iloc[i[0]].title)
         final_posters.append(poster(movies.iloc[i[0]].movie_id))
-<<<<<<< HEAD
-    return final_name , final_cast , rel_date , gen , overview_final , final , final_posters, ratings, re4view, rev, trailer_final
-=======
-    return final_name , final_cast , rel_date , gen , overview_final , final , final_posters, ratings
 
->>>>>>> 1d9f45bab07eda5c2b32d352fdbd2364afa2483c
+    return final_name , final_cast , rel_date , gen , overview_final , final , final_posters, ratings, re4view, rev, trailer_final
+
+
 
 
 movies_dict = pickle.load(open('movies_dict.pkl' , 'rb' ))
 movies = pd.DataFrame(movies_dict)
 similarity = pickle.load(open('similarity.pkl' , 'rb'))
 st.title('Movie Recommendation System')
-<<<<<<< HEAD
+
 filename = 'finalized_model.pkl'
 clf = pickle.load(open(filename, 'rb'))
 vectorizer = pickle.load(open('vectorizer.pkl','rb'))
-=======
->>>>>>> 1d9f45bab07eda5c2b32d352fdbd2364afa2483c
+
 
 selected_movie = st.selectbox(
     'Which Movie Do you like?',
@@ -161,11 +156,11 @@ def process(genre):
     return final
 
 if st.button('Search'):
-<<<<<<< HEAD
+
     name , cast , rel_date , gen , overview_final , ans , posters, ratings, re4view, rev, trailer_final = recommend(selected_movie)
-=======
-    name , cast , rel_date , gen , overview_final , ans , posters, ratings = recommend(selected_movie)
->>>>>>> 1d9f45bab07eda5c2b32d352fdbd2364afa2483c
+
+
+
 
     st.header(selected_movie)
     col_1 , col_2 = st.columns(2)
@@ -183,11 +178,9 @@ if st.button('Search'):
         st.write("Genres : {}".format(gen))
         st.write("Release Date {} : {} ".format(" " , rel_date))
         st.write("Ratings : {} ".format(ratings))
-<<<<<<< HEAD
+
         st.write("Reviews : {} ".format(re4view))
         st.write("Review : {} ".format(rev))
-=======
->>>>>>> 1d9f45bab07eda5c2b32d352fdbd2364afa2483c
 
 
     st.title("Top Casts")
@@ -218,7 +211,7 @@ if st.button('Search'):
         st.caption(name[5])
 
 
-<<<<<<< HEAD
+
     st.title("  Trailer")
     st.video("https://www.youtube.com/watch?v={}".format(trailer_final))
 
@@ -230,9 +223,9 @@ if st.button('Search'):
 
 
 
-=======
+
     st.title("")
->>>>>>> 1d9f45bab07eda5c2b32d352fdbd2364afa2483c
+
 
     st.title("   Similar Movies You May Like")
 
