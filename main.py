@@ -50,6 +50,12 @@ def poster(movie_id):
     data = response.json()
     return "https://image.tmdb.org/t/p/w500/" + data['poster_path']
 
+def rating(movie_id):
+    response = requests.get("https://api.themoviedb.org/3/movie/{}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(movie_id))
+    data = response.json()
+    return data['vote_average']
+
+
 def recommend(movie):
     movie_index = movies[movies['title'] == movie].index[0]
     cosine_angles = similarity[movie_index]
@@ -62,11 +68,12 @@ def recommend(movie):
     gen = genres(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
     overview_final = overview(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
     rel_date = date(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+    ratings = rating(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
     for i in recommended_movies:
 
         final.append(movies.iloc[i[0]].title)
         final_posters.append(poster(movies.iloc[i[0]].movie_id))
-    return final_name , final_cast , rel_date , gen , overview_final , final , final_posters
+    return final_name , final_cast , rel_date , gen , overview_final , final , final_posters, ratings
 
 
 
@@ -89,7 +96,7 @@ def process(genre):
     return final
 
 if st.button('Search'):
-    name , cast , rel_date , gen , overview_final , ans , posters = recommend(selected_movie)
+    name , cast , rel_date , gen , overview_final , ans , posters, ratings = recommend(selected_movie)
 
     st.header(selected_movie)
     col_1 , col_2 = st.columns(2)
@@ -106,6 +113,7 @@ if st.button('Search'):
         gen = " , ".join(gen)
         st.write("Genres : {}".format(gen))
         st.write("Release Date {} : {} ".format(" " , rel_date))
+        st.write("Ratings : {} ".format(ratings))
 
 
     st.title("Top Casts")
