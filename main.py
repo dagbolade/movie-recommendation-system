@@ -70,8 +70,12 @@ def rating(movie_id):
 def review(movie_id):
     response = requests.get("https://api.themoviedb.org/3/movie/{}/reviews?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US&page=1".format(movie_id))
     data = response.json()
-    if len(data['results']) > 0:
-        return data['results'][0]['content']
+    reviews = []
+    for i in data['results'][:3]:
+        reviews.append(i['content'])
+
+    if len(reviews) > 0:
+        return reviews
     else:
         return "No reviews found for this movie."
 
@@ -224,10 +228,18 @@ if st.button('Search'):
     st.video("https://www.youtube.com/watch?v={}".format(trailer_final))
 
     st.title(" Top Reviews")
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.image("https://image.flaticon.com/icons/png/512/25/25231.png", width=225, use_column_width=225)
-        st.write("Review : {} ".format(rev))
+
+    st.image("https://image.flaticon.com/icons/png/512/25/25231.png", width=225, use_column_width=225)
+    for i in range(len(rev)):
+        st.write("Review {}: {}".format(i+1, rev[i]))
+
+
+        # Create a dataframe from the reviews dictionary
+    df = pd.DataFrame.from_dict((re4view), orient='index', columns=['Sentiment'])
+
+    # Display the dataframe in Streamlit
+    st.dataframe(df)
+
 
 
 
@@ -260,6 +272,7 @@ if st.button('Search'):
     with c3:
         st.image(posters[6], width=225, use_column_width=225)
         st.write(ans[6])
+
 
 
 
