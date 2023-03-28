@@ -2,7 +2,7 @@ import streamlit as st
 import pickle
 import pandas as pd
 import requests
-
+import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import json
@@ -76,26 +76,34 @@ def review(movie_id):
         return "No reviews found for this movie."
 
 def get_reviews(movie_id):
-    sauce = urllib.request.urlopen('https://api.themoviedb.org/3/movie/{}/reviews?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US&page=1'.format(movie_id))
-    soup = bs.BeautifulSoup(sauce,'lxml')
-    soup_result = soup.find_all("div",{"class":"text show-more__control"})
+    url = 'https://api.themoviedb.org/3/movie/{}/reviews?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US&page=1'.format(movie_id)
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        results = response.json().get('results')
+        if not results:
+            print('No reviews found for this movie.')
+            return None
+        reviews_list = []
+        reviews_status = []
+        for review in results:
+            review_text = review.get('content')
+            if review_text:
+                reviews_list.append(review_text)
+                # passing the review to our model
+                movie_review_list = np.array([review_text])
+                movie_vector = vectorizer.transform(movie_review_list)
+                pred = clf.predict(movie_vector)
+                reviews_status.append('Positive' if pred else 'Negative')
+        # combining reviews and comments into a dictionary
+        movie_reviews = {reviews_list[i]: reviews_status[i] for i in range(len(reviews_list))}
+        for review, status in movie_reviews.items():
+            print('{} - {}'.format(status, review))
+        return movie_reviews
+    except requests.exceptions.HTTPError as e:
+        print('Error retrieving reviews: {}'.format(e))
+        return None
 
-    reviews_list = [] # list of reviews
-    reviews_status = [] # list of comments (good or bad)
-    for reviews in soup_result:
-        if reviews.string:
-            reviews_list.append(reviews.string)
-            # passing the review to our model
-            movie_review_list = np.array([reviews.string])
-            movie_vector = vectorizer.transform(movie_review_list)
-            pred = clf.predict(movie_vector)
-            reviews_status.append('Positive' if pred else 'Negative')
-
-
-
-    # combining reviews and comments into a dictionary
-    movie_reviews = {reviews_list[i]: reviews_status[i] for i in range(len(reviews_list))}
-    return movie_reviews
 
 def trailer(movie_id):
     response = requests.get("https://api.themoviedb.org/3/movie/{}/videos?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(movie_id))
