@@ -234,11 +234,12 @@ if st.button('Search'):
         st.write("Review {}: {}".format(i+1, rev[i]))
 
 
-        # Create a dataframe from the reviews dictionary
+    # Create a dataframe from the reviews dictionary
     df = pd.DataFrame.from_dict((re4view), orient='index', columns=['Sentiment'])
 
-    # Display the dataframe in Streamlit
-    st.dataframe(df)
+   # Display the dataframe in Streamlit
+    st.write("Reviews:")
+    st.table(df.style.highlight_max(axis=0))
 
 
 
