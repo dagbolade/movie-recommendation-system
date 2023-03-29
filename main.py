@@ -275,6 +275,28 @@ if st.button('Search'):
         st.write(ans[6])
 
 
+import streamlit as st
+
+# Add a social sharing menu
+def add_share_menu():
+    url = selected_movie # Replace with your app URL
+    twitter_text = 'Check out this cool movie' # Replace with your Twitter message
+    whatsapp_text = 'Check out this cool movie: {}'.format(url) # Replace with your WhatsApp message
+
+    st.sidebar.subheader('Share')
+    st.sidebar.write('Share this app with your friends and colleagues:')
+    tweet_btn = st.sidebar.button(label='Twitter')
+    if tweet_btn:
+        tweet_url = 'https://twitter.com/intent/tweet?text={}&url={}'.format(twitter_text, url)
+        st.sidebar.markdown('[![Tweet](https://img.shields.io/twitter/url?style=social&url={})]({})'.format(tweet_url, tweet_url), unsafe_allow_html=True)
+
+    whatsapp_btn = st.sidebar.button(label='WhatsApp')
+    if whatsapp_btn:
+        whatsapp_url = 'https://wa.me/?text={}'.format(whatsapp_text)
+        st.sidebar.markdown('[![WhatsApp](https://img.shields.io/badge/WhatsApp-Chat-green?style=social&logo=whatsapp)]({})'.format(whatsapp_url), unsafe_allow_html=True)
+
+# Add the social sharing menu to your app
+add_share_menu()
 
 
 
