@@ -12,6 +12,8 @@ import urllib.request
 import pickle
 import requests
 from datetime import date, datetime
+import matplotlib.pyplot as plt
+
 
 
 
@@ -101,12 +103,21 @@ def get_reviews(movie_id):
                 reviews_status.append('Positive' if pred else 'Negative')
         # combining reviews and comments into a dictionary
         movie_reviews = {reviews_list[i]: reviews_status[i] for i in range(len(reviews_list))}
+
+
+
+
+
+
+
+
         for review, status in movie_reviews.items():
             print('{} - {}'.format(status, review))
         return movie_reviews
     except requests.exceptions.HTTPError as e:
         print('Error retrieving reviews: {}'.format(e))
         return None
+
 
 
 def trailer(movie_id):
@@ -191,8 +202,12 @@ if st.button('Search'):
         st.write("Release Date {} : {} ".format(" " , rel_date))
         st.write("Ratings : {} ".format(ratings))
 
-        st.write("Reviews : {} ".format(re4view))
-        st.write("Review : {} ".format(rev))
+
+
+
+
+
+
 
 
     st.title("Top Casts")
@@ -227,19 +242,42 @@ if st.button('Search'):
     st.title("  Trailer")
     st.video("https://www.youtube.com/watch?v={}".format(trailer_final))
 
-    st.title(" Top Reviews")
-
-    st.image("https://image.flaticon.com/icons/png/512/25/25231.png", width=225, use_column_width=225)
-    for i in range(len(rev)):
-        st.write("Review {}: {}".format(i+1, rev[i]))
 
 
-    # Create a dataframe from the reviews dictionary
-    df = pd.DataFrame.from_dict((re4view), orient='index', columns=['Sentiment'])
 
-   # Display the dataframe in Streamlit
-    st.write("Reviews:")
-    st.table(df.style.highlight_max(axis=0))
+
+
+
+   # Check if there are any reviews
+    if re4view:
+        # plot a bar graph of the reviews
+        pos_count = 0
+        neg_count = 0
+        for review in re4view.values():
+            if review == 'Positive':
+                pos_count += 1
+            else:
+                neg_count += 1
+
+
+        # Plotting the bar graph
+        fig, ax = plt.subplots()
+        ax.bar(['Positive', 'Negative'], [pos_count, neg_count])
+        ax.set_title('Sentiment Analysis of Reviews')
+        ax.set_xlabel('Sentiment')
+        ax.set_ylabel('Number of Reviews')
+        st.pyplot(fig)
+
+        # Create a dataframe from the reviews dictionary
+        df = pd.DataFrame.from_dict((re4view), orient='index', columns=['Sentiment'])
+
+        # Display the dataframe in Streamlit
+        st.write("Reviews:")
+        st.table(df.style.highlight_max(axis=0))
+    else:
+        st.write("No reviews found for this movie.")
+
+
 
 
 
@@ -252,8 +290,13 @@ if st.button('Search'):
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.image(posters[1], width=225, use_column_width=225)
-        st.write(ans[1])
+
+         st.image(posters[1], width=225, use_column_width=225)
+         st.write(ans[1])
+
+
+
+
     with c2:
         st.image( posters[2], width=225, use_column_width=225)
         st.write(ans[2])
@@ -275,28 +318,28 @@ if st.button('Search'):
         st.write(ans[6])
 
 
-import streamlit as st
+    import streamlit as st
 
-# Add a social sharing menu
-def add_share_menu():
-    url = selected_movie # Replace with your app URL
-    twitter_text = 'Check out this cool movie' # Replace with your Twitter message
-    whatsapp_text = 'Check out this cool movie: {}'.format(url) # Replace with your WhatsApp message
+    # Add a social sharing menu
+    def add_share_menu():
+        url = selected_movie # Replace with your app URL
+        twitter_text = 'Check out this cool movie' # Replace with your Twitter message
+        whatsapp_text = 'Check out this cool movie: {}'.format(url) # Replace with your WhatsApp message
 
-    st.sidebar.subheader('Share')
-    st.sidebar.write('Share this app with your friends and colleagues:')
-    tweet_btn = st.sidebar.button(label='Twitter')
-    if tweet_btn:
-        tweet_url = 'https://twitter.com/intent/tweet?text={}&url={}'.format(twitter_text, url)
-        st.sidebar.markdown('[![Tweet](https://img.shields.io/twitter/url?style=social&url={})]({})'.format(tweet_url, tweet_url), unsafe_allow_html=True)
+        st.sidebar.subheader('Share')
+        st.sidebar.write('Share this app with your friends and colleagues:')
+        tweet_btn = st.sidebar.button(label='Twitter')
+        if tweet_btn:
+            tweet_url = 'https://twitter.com/intent/tweet?text={}&url={}'.format(twitter_text, url)
+            st.sidebar.markdown('[![Tweet](https://img.shields.io/twitter/url?style=social&url={})]({})'.format(tweet_url, tweet_url), unsafe_allow_html=True)
 
-    whatsapp_btn = st.sidebar.button(label='WhatsApp')
-    if whatsapp_btn:
-        whatsapp_url = 'https://wa.me/?text={}'.format(whatsapp_text)
-        st.sidebar.markdown('[![WhatsApp](https://img.shields.io/badge/WhatsApp-Chat-green?style=social&logo=whatsapp)]({})'.format(whatsapp_url), unsafe_allow_html=True)
+        whatsapp_btn = st.sidebar.button(label='WhatsApp')
+        if whatsapp_btn:
+            whatsapp_url = 'https://wa.me/?text={}'.format(whatsapp_text)
+            st.sidebar.markdown('[![WhatsApp](https://img.shields.io/badge/WhatsApp-Chat-green?style=social&logo=whatsapp)]({})'.format(whatsapp_url), unsafe_allow_html=True)
 
-# Add the social sharing menu to your app
-add_share_menu()
+    # Add the social sharing menu to your app
+    add_share_menu()
 
 
 
