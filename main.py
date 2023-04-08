@@ -341,6 +341,50 @@ if st.button('Search'):
     # Add the social sharing menu to your app
     add_share_menu()
 
+import os
+
+# Create a file to store the watchlist
+WATCHLIST_FILE = 'watchlist.txt'
+if not os.path.exists(WATCHLIST_FILE):
+    open(WATCHLIST_FILE, 'w').close()
+
+# Load the watchlist from the file
+with open(WATCHLIST_FILE, 'r') as f:
+    watchlist = f.read().splitlines()
+
+# Create a form to add a movie to the watchlist
+with st.form(key='add_movie_form'):
+    movie_title = st.text_input(label='Movie Title', value=selected_movie)
+    add_movie = st.form_submit_button(label='Add Movie')
+
+# If the add movie button is clicked and the movie title is not empty, add the movie to the watchlist and save to the file
+if add_movie and movie_title:
+    watchlist.append(movie_title)
+    with open(WATCHLIST_FILE, 'w') as f:
+        f.write('\n'.join(watchlist))
+    st.success(f'{movie_title} added to Watchlist!')
+
+# Display the watchlist with movie details
+if watchlist:
+    movie_data = []
+    for movie in watchlist:
+        # Make a request to the OMDb API to get movie details
+        response = requests.get(
+            "https://api.themoviedb.org/3/search/movie?api_key=4158f8d4403c843543d3dc953f225d77&query={}".format(
+                movie))
+        if response.status_code == 200:
+            data = response.json()['results'][0]
+            movie_data.append(data)
+    if movie_data:
+        df = pd.DataFrame(movie_data, columns=['title', 'overview'])
+        st.write(df)
+    else:
+        st.write('No movie details found.')
+else:
+    st.write('Watchlist is empty.')
+
+
+
 
 
 
