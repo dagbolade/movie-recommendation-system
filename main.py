@@ -382,6 +382,7 @@ if remove_movie and selected_movie:
 
 
 
+
 # Display the watchlist with movie details
 if watchlist:
     movie_data = []
