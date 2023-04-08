@@ -354,15 +354,33 @@ with open(WATCHLIST_FILE, 'r') as f:
 
 # Create a form to add a movie to the watchlist
 with st.form(key='add_movie_form'):
-    movie_title = st.text_input(label='Movie Title', value=selected_movie)
+    movie_title = st.text_input(label='WATCHLIST', value=selected_movie)
     add_movie = st.form_submit_button(label='Add Movie')
 
-# If the add movie button is clicked and the movie title is not empty, add the movie to the watchlist and save to the file
+# If the add movie button is clicked and the movie title is not empty, add the movie to the watchlist
 if add_movie and movie_title:
-    watchlist.append(movie_title)
-    with open(WATCHLIST_FILE, 'w') as f:
-        f.write('\n'.join(watchlist))
-    st.success(f'{movie_title} added to Watchlist!')
+    if movie_title not in watchlist:
+        watchlist.append(movie_title)
+        st.success(f'{movie_title} added to Watchlist!')
+    else:
+        st.warning(f'{movie_title} is already in the Watchlist!')
+
+# If the add movie button is clicked and the movie title is empty, show an error message
+if add_movie and not movie_title:
+    st.error('Please enter a movie title.')
+
+# Create a form to remove a movie from the watchlist
+with st.form(key='remove_movie_form'):
+    # Display the watchlist as a selectbox
+    selected_movie = st.selectbox('Select a movie to remove from Watchlist', watchlist)
+    remove_movie = st.form_submit_button(label='Remove Movie')
+
+# If the remove movie button is clicked, remove the selected movie from the watchlist
+if remove_movie and selected_movie:
+    watchlist.remove(selected_movie)
+    st.success(f'{selected_movie} removed from Watchlist!')
+
+
 
 # Display the watchlist with movie details
 if watchlist:
