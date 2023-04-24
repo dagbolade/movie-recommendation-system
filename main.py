@@ -128,30 +128,32 @@ def trailer(movie_id):
 
 
 def recommend(movie):
-    movie_index = movies[movies['title'] == movie].index[0]
-    cosine_angles = similarity[movie_index]
-    recommended_movies = sorted(list(enumerate(cosine_angles)), reverse=True, key=lambda x: x[1])[0:7]
+    try:
+        movie_index = movies[movies['title'] == movie].index[0]
+        cosine_angles = similarity[movie_index]
+        recommended_movies = sorted(list(enumerate(cosine_angles)), reverse=True, key=lambda x: x[1])[0:7]
 
 
-    final = []
-    final_posters = []
-    final_name , final_cast = crew(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-    gen = genres(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-    overview_final = overview(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-    rel_date = date(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-    ratings = rating(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+        final = []
+        final_posters = []
+        final_name , final_cast = crew(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+        gen = genres(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+        overview_final = overview(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+        rel_date = date(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+        ratings = rating(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
 
-    re4view = get_reviews(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-    rev = review(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-    trailer_final = trailer(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+        re4view = get_reviews(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+        rev = review(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+        trailer_final = trailer(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
 
-    for i in recommended_movies:
+        for i in recommended_movies:
 
-        final.append(movies.iloc[i[0]].title)
-        final_posters.append(poster(movies.iloc[i[0]].movie_id))
+            final.append(movies.iloc[i[0]].title)
+            final_posters.append(poster(movies.iloc[i[0]].movie_id))
 
-    return final_name , final_cast , rel_date , gen , overview_final , final , final_posters, ratings, re4view, rev, trailer_final
-
+        return final_name , final_cast , rel_date , gen , overview_final , final , final_posters, ratings, re4view, rev, trailer_final
+    except IndexError:
+        return None
 
 
 
@@ -179,103 +181,30 @@ def process(genre):
     return final
 
 if st.button('Search'):
+    result = recommend(selected_movie)
 
-    name , cast , rel_date , gen , overview_final , ans , posters, ratings, re4view, rev, trailer_final = recommend(selected_movie)
-
-
-
-
-    st.header(selected_movie)
-    col_1 , col_2 = st.columns(2)
-
-
-    with col_1:
-        st.image(posters[0] , width=  325 , use_column_width= 325)
-
-    with col_2:
-        st.write("Title : {} ".format(ans[0]))
-
-        st.write("Overview : {} ".format(overview_final))
-        gen = process(gen)
-        gen = " , ".join(gen)
-        st.write("Genres : {}".format(gen))
-        st.write("Release Date {} : {} ".format(" " , rel_date))
-        st.write("Ratings : {} ".format(ratings))
-
-
-
-
-
-
-
-
-
-    st.title("Top Casts")
-
-    c1 , c2 , c3 = st.columns(3)
-    with c1:
-        st.image(cast[0] , width=  225 , use_column_width= 225)
-        st.caption(name[0])
-    with c2:
-        st.image(cast[1] , width=  225 , use_column_width= 225)
-        st.caption(name[1])
-    with c3:
-        st.image(cast[2], width=  225 , use_column_width= 225)
-        st.caption(name[2])
-
-
-    c1 , c2 ,c3 = st.columns(3)
-    with c1:
-        st.image(cast[3], width=  225 , use_column_width= 225)
-        st.caption(name[3])
-
-    with c2:
-        st.image(cast[4], width=  225 , use_column_width= 225)
-        st.caption(name[4])
-
-    with c3:
-        st.image(cast[5], width=225, use_column_width=225)
-        st.caption(name[5])
-
-
-
-    st.title("  Trailer")
-    st.video("https://www.youtube.com/watch?v={}".format(trailer_final))
-
-
-
-
-
-
-
-   # Check if there are any reviews
-    if re4view:
-        # plot a bar graph of the reviews
-        pos_count = 0
-        neg_count = 0
-        for review in re4view.values():
-            if review == 'Positive':
-                pos_count += 1
-            else:
-                neg_count += 1
-
-
-        # Plotting the bar graph
-        fig, ax = plt.subplots()
-        ax.bar(['Positive', 'Negative'], [pos_count, neg_count])
-        ax.set_title('Sentiment Analysis of Reviews')
-        ax.set_xlabel('Sentiment')
-        ax.set_ylabel('Number of Reviews')
-        st.pyplot(fig)
-
-        # Create a dataframe from the reviews dictionary
-        df = pd.DataFrame.from_dict((re4view), orient='index', columns=['Sentiment'])
-
-        # Display the dataframe in Streamlit
-        st.write("Reviews:")
-        st.table(df.style.highlight_max(axis=0))
+    if result is None:
+        st.error("Sorry, the movie you requested is not in our database. Please check the spelling or try with some other movies.")
     else:
-        st.write("No reviews found for this movie.")
+        name, cast, rel_date, gen, overview_final, ans, posters, ratings, re4view, rev, trailer_final = result[:11]
+
+
+        st.header(selected_movie)
+        col_1 , col_2 = st.columns(2)
+
+
+        with col_1:
+            st.image(posters[0] , width=  325 , use_column_width= 325)
+
+        with col_2:
+            st.write("Title : {} ".format(ans[0]))
+
+            st.write("Overview : {} ".format(overview_final))
+            gen = process(gen)
+            gen = " , ".join(gen)
+            st.write("Genres : {}".format(gen))
+            st.write("Release Date {} : {} ".format(" " , rel_date))
+            st.write("Ratings : {} ".format(ratings))
 
 
 
@@ -283,63 +212,138 @@ if st.button('Search'):
 
 
 
-    st.title("")
 
 
-    st.title("   Similar Movies You May Like")
+        st.title("Top Casts")
 
-    c1, c2, c3 = st.columns(3)
-    with c1:
-
-         st.image(posters[1], width=225, use_column_width=225)
-         st.write(ans[1])
-
-
-
-
-    with c2:
-        st.image( posters[2], width=225, use_column_width=225)
-        st.write(ans[2])
-    with c3:
-        st.image(posters[3], width=225, use_column_width=225)
-        st.write(ans[3])
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.image(posters[4], width=225, use_column_width=225)
-        st.write(ans[4])
-
-    with c2:
-        st.image(posters[5], width=225, use_column_width=225)
-        st.write(ans[5])
-
-    with c3:
-        st.image(posters[6], width=225, use_column_width=225)
-        st.write(ans[6])
+        c1 , c2 , c3 = st.columns(3)
+        with c1:
+            st.image(cast[0] , width=  225 , use_column_width= 225)
+            st.caption(name[0])
+        with c2:
+            st.image(cast[1] , width=  225 , use_column_width= 225)
+            st.caption(name[1])
+        with c3:
+            st.image(cast[2], width=  225 , use_column_width= 225)
+            st.caption(name[2])
 
 
-    import streamlit as st
+        c1 , c2 ,c3 = st.columns(3)
+        with c1:
+            st.image(cast[3], width=  225 , use_column_width= 225)
+            st.caption(name[3])
 
-    # Add a social sharing menu
-    def add_share_menu():
-        url = selected_movie # Replace with your app URL
-        twitter_text = 'Check out this cool movie' # Replace with your Twitter message
-        whatsapp_text = 'Check out this cool movie: {}'.format(url) # Replace with your WhatsApp message
+        with c2:
+            st.image(cast[4], width=  225 , use_column_width= 225)
+            st.caption(name[4])
 
-        st.sidebar.subheader('Share')
-        st.sidebar.write('Share this app with your friends and colleagues:')
-        tweet_btn = st.sidebar.button(label='Twitter')
-        if tweet_btn:
-            tweet_url = 'https://twitter.com/intent/tweet?text={}&url={}'.format(twitter_text, url)
-            st.sidebar.markdown('[![Tweet](https://img.shields.io/twitter/url?style=social&url={})]({})'.format(tweet_url, tweet_url), unsafe_allow_html=True)
+        with c3:
+            st.image(cast[5], width=225, use_column_width=225)
+            st.caption(name[5])
 
-        whatsapp_btn = st.sidebar.button(label='WhatsApp')
-        if whatsapp_btn:
-            whatsapp_url = 'https://wa.me/?text={}'.format(whatsapp_text)
-            st.sidebar.markdown('[![WhatsApp](https://img.shields.io/badge/WhatsApp-Chat-green?style=social&logo=whatsapp)]({})'.format(whatsapp_url), unsafe_allow_html=True)
 
-    # Add the social sharing menu to your app
-    add_share_menu()
+
+        st.title("  Trailer")
+        st.video("https://www.youtube.com/watch?v={}".format(trailer_final))
+
+
+
+
+
+
+
+       # Check if there are any reviews
+        if re4view:
+            # plot a bar graph of the reviews
+            pos_count = 0
+            neg_count = 0
+            for review in re4view.values():
+                if review == 'Positive':
+                    pos_count += 1
+                else:
+                    neg_count += 1
+
+
+            # Plotting the bar graph
+            fig, ax = plt.subplots()
+            ax.bar(['Positive', 'Negative'], [pos_count, neg_count])
+            ax.set_title('Sentiment Analysis of Reviews')
+            ax.set_xlabel('Sentiment')
+            ax.set_ylabel('Number of Reviews')
+            st.pyplot(fig)
+
+            # Create a dataframe from the reviews dictionary
+            df = pd.DataFrame.from_dict((re4view), orient='index', columns=['Sentiment'])
+
+            # Display the dataframe in Streamlit
+            st.write("Reviews:")
+            st.table(df.style.highlight_max(axis=0))
+        else:
+            st.write("No reviews found for this movie.")
+
+
+
+
+
+
+
+        st.title("")
+
+
+        st.title("   Similar Movies You May Like")
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+
+             st.image(posters[1], width=225, use_column_width=225)
+             st.write(ans[1])
+
+
+
+
+        with c2:
+            st.image( posters[2], width=225, use_column_width=225)
+            st.write(ans[2])
+        with c3:
+            st.image(posters[3], width=225, use_column_width=225)
+            st.write(ans[3])
+
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.image(posters[4], width=225, use_column_width=225)
+            st.write(ans[4])
+
+        with c2:
+            st.image(posters[5], width=225, use_column_width=225)
+            st.write(ans[5])
+
+        with c3:
+            st.image(posters[6], width=225, use_column_width=225)
+            st.write(ans[6])
+
+
+        import streamlit as st
+
+        # Add a social sharing menu
+        def add_share_menu():
+            url = selected_movie # Replace with your app URL
+            twitter_text = 'Check out this cool movie' # Replace with your Twitter message
+            whatsapp_text = 'Check out this cool movie: {}'.format(url) # Replace with your WhatsApp message
+
+            st.sidebar.subheader('Share')
+            st.sidebar.write('Share this app with your friends and colleagues:')
+            tweet_btn = st.sidebar.button(label='Twitter')
+            if tweet_btn:
+                tweet_url = 'https://twitter.com/intent/tweet?text={}&url={}'.format(twitter_text, url)
+                st.sidebar.markdown('[![Tweet](https://img.shields.io/twitter/url?style=social&url={})]({})'.format(tweet_url, tweet_url), unsafe_allow_html=True)
+
+            whatsapp_btn = st.sidebar.button(label='WhatsApp')
+            if whatsapp_btn:
+                whatsapp_url = 'https://wa.me/?text={}'.format(whatsapp_text)
+                st.sidebar.markdown('[![WhatsApp](https://img.shields.io/badge/WhatsApp-Chat-green?style=social&logo=whatsapp)]({})'.format(whatsapp_url), unsafe_allow_html=True)
+
+        # Add the social sharing menu to your app
+        add_share_menu()
 
 import os
 
@@ -383,6 +387,7 @@ if remove_movie and selected_movie:
 
 
 
+
 # Display the watchlist with movie details
 if watchlist:
     movie_data = []
@@ -392,8 +397,10 @@ if watchlist:
             "https://api.themoviedb.org/3/search/movie?api_key=4158f8d4403c843543d3dc953f225d77&query={}".format(
                 movie))
         if response.status_code == 200:
-            data = response.json()['results'][0]
-            movie_data.append(data)
+            results = response.json()['results']
+            if len(results) > 0:
+                data = results[0]
+                movie_data.append(data)
     if movie_data:
         df = pd.DataFrame(movie_data, columns=['title', 'overview'])
         st.write(df)
@@ -401,7 +408,6 @@ if watchlist:
         st.write('No movie details found.')
 else:
     st.write('Watchlist is empty.')
-
 
 
 
