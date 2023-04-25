@@ -6,18 +6,13 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import json
-import bs4 as bs
-from bs4 import BeautifulSoup
-import urllib.request
 import pickle
 import requests
 from datetime import date, datetime
 import matplotlib.pyplot as plt
 
 
-
-
-
+# Functions for getting movie information from TMDB API
 def crew(movie_id):
     response = requests.get(
         "https://api.themoviedb.org/3/movie/{0}/credits?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
@@ -27,7 +22,7 @@ def crew(movie_id):
     final_cast = []
     k = 0
     for i in data["cast"]:
-        if(k!=6):
+        if k != 6 and i['profile_path'] is not None:
             crew_name.append(i['name'])
             final_cast.append("https://image.tmdb.org/t/p/w500/" + i['profile_path'])
             k+=1
@@ -81,39 +76,51 @@ def review(movie_id):
     else:
         return "No reviews found for this movie."
 
+# Define the function to get movie reviews
 def get_reviews(movie_id):
+
+    # Create the URL for the API request with the provided movie ID
     url = 'https://api.themoviedb.org/3/movie/{}/reviews?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US&page=1'.format(movie_id)
+
     try:
+        # Send a GET request to the API with the URL and check for any errors
         response = requests.get(url)
         response.raise_for_status()
+        # Get the reviews from the API response and store them in a list
         results = response.json().get('results')
+        # If there are no reviews, print a message and return None
         if not results:
             print('No reviews found for this movie.')
             return None
+
+        # Initialize two empty lists to store the reviews and their sentiment
         reviews_list = []
         reviews_status = []
+
+        # Loop through each review in the results list
         for review in results:
+            # Get the text content of the review
             review_text = review.get('content')
+            # If the review has text content, add it to the reviews_list and predict the sentiment
             if review_text:
                 reviews_list.append(review_text)
                 # passing the review to our model
                 movie_review_list = np.array([review_text])
                 movie_vector = vectorizer.transform(movie_review_list)
                 pred = clf.predict(movie_vector)
+                # Append the sentiment ('Positive' or 'Negative') to the reviews_status list
                 reviews_status.append('Positive' if pred else 'Negative')
-        # combining reviews and comments into a dictionary
+
+        # Combine the reviews and their sentiment into a dictionary
         movie_reviews = {reviews_list[i]: reviews_status[i] for i in range(len(reviews_list))}
 
-
-
-
-
-
-
-
+        # Loop through each review and its sentiment in the dictionary and print it
         for review, status in movie_reviews.items():
             print('{} - {}'.format(status, review))
+        # Return the dictionary of reviews and their sentiment
         return movie_reviews
+
+    # Catch any HTTP errors and print an error message
     except requests.exceptions.HTTPError as e:
         print('Error retrieving reviews: {}'.format(e))
         return None
@@ -129,31 +136,58 @@ def trailer(movie_id):
 
 def recommend(movie):
     try:
+        # Get the index of the selected movie
         movie_index = movies[movies['title'] == movie].index[0]
+
+        # Get cosine similarity scores of the selected movie with all other movies
         cosine_angles = similarity[movie_index]
+
+        # Get the 7 movies with highest similarity scores
         recommended_movies = sorted(list(enumerate(cosine_angles)), reverse=True, key=lambda x: x[1])[0:7]
 
-
+        # Initialize lists to store recommended movies' details
         final = []
         final_posters = []
+
+        # Get the crew details (director, cast) of the selected movie
         final_name , final_cast = crew(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+
+        # Get the genres of the selected movie
         gen = genres(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+
+        # Get the overview of the selected movie
         overview_final = overview(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+
+        # Get the release date of the selected movie
         rel_date = date(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+
+        # Get the ratings of the selected movie
         ratings = rating(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
 
+        # Get the reviews of the selected movie
         re4view = get_reviews(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-        rev = review(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+
+        # Get the average rating of the selected movie
+        rev = rating(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
+
+        # Get the trailer link of the selected movie
         trailer_final = trailer(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
 
+        # Loop through recommended movies to store their details
         for i in recommended_movies:
-
+            # Store recommended movie title
             final.append(movies.iloc[i[0]].title)
+
+            # Store recommended movie poster
             final_posters.append(poster(movies.iloc[i[0]].movie_id))
 
+        # Return all details
         return final_name , final_cast , rel_date , gen , overview_final , final , final_posters, ratings, re4view, rev, trailer_final
+
+    # Catch index error when selected movie not found in dataset
     except IndexError:
         return None
+
 
 
 
@@ -172,7 +206,7 @@ selected_movie = st.selectbox(
      movies['title'].values)
 
 
-
+# This function takes a list of genres and returns a list of genre names
 def process(genre):
     final = []
     for i in genre:
@@ -180,22 +214,22 @@ def process(genre):
 
     return final
 
+# When the user clicks the "Search" button in the web app, this code runs
 if st.button('Search'):
     result = recommend(selected_movie)
 
+     # If the movie is not found in the database, an error message is displayed
     if result is None:
         st.error("Sorry, the movie you requested is not in our database. Please check the spelling or try with some other movies.")
     else:
+         # Extracts the necessary details about the movie from the result
         name, cast, rel_date, gen, overview_final, ans, posters, ratings, re4view, rev, trailer_final = result[:11]
 
-
+        # Displays the movie details in a header and two columns
         st.header(selected_movie)
         col_1 , col_2 = st.columns(2)
-
-
         with col_1:
             st.image(posters[0] , width=  325 , use_column_width= 325)
-
         with col_2:
             st.write("Title : {} ".format(ans[0]))
 
@@ -206,51 +240,36 @@ if st.button('Search'):
             st.write("Release Date {} : {} ".format(" " , rel_date))
             st.write("Ratings : {} ".format(ratings))
 
-
-
-
-
-
-
-
-
+        # Displays the top 6 cast members in a row of images with their names
         st.title("Top Casts")
 
         c1 , c2 , c3 = st.columns(3)
-        with c1:
-            st.image(cast[0] , width=  225 , use_column_width= 225)
-            st.caption(name[0])
-        with c2:
-            st.image(cast[1] , width=  225 , use_column_width= 225)
-            st.caption(name[1])
-        with c3:
-            st.image(cast[2], width=  225 , use_column_width= 225)
-            st.caption(name[2])
+        if len(cast) >= 6 and len(name) >= 6:
+            with c1:
+                st.image(cast[0], width=225, use_column_width=225)
+                st.caption(name[0])
+            with c2:
+                st.image(cast[1], width=225, use_column_width=225)
+                st.caption(name[1])
+            with c3:
+                st.image(cast[2], width=225, use_column_width=225)
+                st.caption(name[2])
 
-
-        c1 , c2 ,c3 = st.columns(3)
-        with c1:
-            st.image(cast[3], width=  225 , use_column_width= 225)
-            st.caption(name[3])
-
-        with c2:
-            st.image(cast[4], width=  225 , use_column_width= 225)
-            st.caption(name[4])
-
-        with c3:
-            st.image(cast[5], width=225, use_column_width=225)
-            st.caption(name[5])
-
-
-
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.image(cast[3], width=225, use_column_width=225)
+                st.caption(name[3])
+            with c2:
+                st.image(cast[4], width=225, use_column_width=225)
+                st.caption(name[4])
+            with c3:
+                st.image(cast[5], width=225, use_column_width=225)
+                st.caption(name[5])
+        else:
+            st.warning("Not enough cast members to display.")
+        # Displays the trailer for the movie using a YouTube link
         st.title("  Trailer")
         st.video("https://www.youtube.com/watch?v={}".format(trailer_final))
-
-
-
-
-
-
 
        # Check if there are any reviews
         if re4view:
@@ -281,12 +300,6 @@ if st.button('Search'):
         else:
             st.write("No reviews found for this movie.")
 
-
-
-
-
-
-
         st.title("")
 
 
@@ -294,32 +307,36 @@ if st.button('Search'):
 
         c1, c2, c3 = st.columns(3)
         with c1:
-
-             st.image(posters[1], width=225, use_column_width=225)
-             st.write(ans[1])
-
-
+            st.image(posters[1], width=225, use_column_width=225)
+            st.write(ans[1])
 
 
         with c2:
-            st.image( posters[2], width=225, use_column_width=225)
+            st.image(posters[2], width=225, use_column_width=225)
             st.write(ans[2])
+
+
         with c3:
             st.image(posters[3], width=225, use_column_width=225)
             st.write(ans[3])
+
 
         c1, c2, c3 = st.columns(3)
         with c1:
             st.image(posters[4], width=225, use_column_width=225)
             st.write(ans[4])
 
+
         with c2:
             st.image(posters[5], width=225, use_column_width=225)
             st.write(ans[5])
 
+
         with c3:
             st.image(posters[6], width=225, use_column_width=225)
             st.write(ans[6])
+
+
 
 
         import streamlit as st
@@ -365,6 +382,8 @@ with st.form(key='add_movie_form'):
 if add_movie and movie_title:
     if movie_title not in watchlist:
         watchlist.append(movie_title)
+        with open(WATCHLIST_FILE, 'w') as f:
+            f.write('\n'.join(watchlist))
         st.success(f'{movie_title} added to Watchlist!')
     else:
         st.warning(f'{movie_title} is already in the Watchlist!')
@@ -380,10 +399,12 @@ with st.form(key='remove_movie_form'):
     remove_movie = st.form_submit_button(label='Remove Movie')
 
 # If the remove movie button is clicked, remove the selected movie from the watchlist
+
 if remove_movie and selected_movie:
     watchlist.remove(selected_movie)
+    with open(WATCHLIST_FILE, 'w') as f:
+        f.write('\n'.join(watchlist))
     st.success(f'{selected_movie} removed from Watchlist!')
-
 
 
 
