@@ -196,7 +196,7 @@ movies = pd.DataFrame(movies_dict)
 similarity = pickle.load(open('similarity.pkl' , 'rb'))
 st.title('Movie Recommendation System')
 
-filename = 'finalized_model.pkl'
+filename = 'model.pkl'
 clf = pickle.load(open(filename, 'rb'))
 vectorizer = pickle.load(open('vectorizer.pkl','rb'))
 
