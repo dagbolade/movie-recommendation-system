@@ -12,9 +12,6 @@ from datetime import date, datetime
 import matplotlib.pyplot as plt
 
 
-
-
-
 st.set_page_config(page_title="Recommender system", layout="wide")
 
 
@@ -22,8 +19,8 @@ st.set_page_config(page_title="Recommender system", layout="wide")
 with open('style.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
-# your Streamlit app code here
 
+@st.cache_data
 # Functions for getting movie information from TMDB API
 def crew(movie_id):
     response = requests.get(
@@ -373,6 +370,7 @@ if st.button('Search'):
 
         # Add the social sharing menu to your app
         add_share_menu()
+
 
 import os
 
