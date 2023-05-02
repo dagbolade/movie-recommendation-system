@@ -349,18 +349,20 @@ if st.button('Search'):
 
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.image(posters[4], width=225, use_column_width=225)
-            st.write(ans[4])
-
+            if posters[4] is not None:
+                st.image(posters[4], width=225, use_column_width=225)
+                st.write(ans[4])
 
         with c2:
-            st.image(posters[5], width=225, use_column_width=225)
-            st.write(ans[5])
-
+            if posters[5] is not None:
+                st.image(posters[5], width=225, use_column_width=225)
+                st.write(ans[5])
 
         with c3:
-            st.image(posters[6], width=225, use_column_width=225)
-            st.write(ans[6])
+            if posters[6] is not None:
+                st.image(posters[6], width=225, use_column_width=225)
+                st.write(ans[6])
+
 
 
 
