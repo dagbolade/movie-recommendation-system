@@ -1,4 +1,4 @@
-sklearn
+
 preprocessing
 numpy
 yfinance
