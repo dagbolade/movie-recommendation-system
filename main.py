@@ -12,6 +12,18 @@ from datetime import date, datetime
 import matplotlib.pyplot as plt
 
 
+
+
+
+st.set_page_config(page_title="Recommender system", layout="wide")
+
+
+# add styling
+with open('style.css') as f:
+    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+# your Streamlit app code here
+
 # Functions for getting movie information from TMDB API
 def crew(movie_id):
     response = requests.get(
@@ -196,7 +208,7 @@ movies = pd.DataFrame(movies_dict)
 similarity = pickle.load(open('similarity.pkl' , 'rb'))
 st.title('Movie Recommendation System')
 
-filename = 'model.pkl'
+filename = 'model2.pkl'
 clf = pickle.load(open(filename, 'rb'))
 vectorizer = pickle.load(open('vectorizer.pkl','rb'))
 
@@ -413,7 +425,7 @@ if remove_movie and selected_movie:
 if watchlist:
     movie_data = []
     for movie in watchlist:
-        # Make a request to the OMDb API to get movie details
+        # Make a request to the TMDb API to get movie details
         response = requests.get(
             "https://api.themoviedb.org/3/search/movie?api_key=4158f8d4403c843543d3dc953f225d77&query={}".format(
                 movie))
