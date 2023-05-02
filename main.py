@@ -245,7 +245,7 @@ if st.button('Search'):
          # Extracts the necessary details about the movie from the result
         name, cast, rel_date, gen, overview_final, ans, posters, ratings, re4view, rev, trailer_final = result[:11]
 
-        # Displays the movie details in a header and two columns
+        # Display the movie details in a header and two columns
         st.header(selected_movie)
         col_1 , col_2 = st.columns(2)
         with col_1:
