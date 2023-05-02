@@ -20,6 +20,7 @@ with open('style.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
 
+
 @st.cache_data
 # Functions for getting movie information from TMDB API
 def crew(movie_id):
@@ -62,10 +63,15 @@ def overview(movie_id):
             movie_id))
     data = response.json()
     return data['overview']
+
 def poster(movie_id):
     response = requests.get("https://api.themoviedb.org/3/movie/{}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(movie_id))
     data = response.json()
-    return "https://image.tmdb.org/t/p/w500/" + data['poster_path']
+    if 'poster_path' in data:
+        return "https://image.tmdb.org/t/p/w500/" + data['poster_path']
+    else:
+        return None
+
 
 def rating(movie_id):
     response = requests.get("https://api.themoviedb.org/3/movie/{}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(movie_id))
@@ -203,7 +209,11 @@ def recommend(movie):
 movies_dict = pickle.load(open('movies_dict.pkl' , 'rb' ))
 movies = pd.DataFrame(movies_dict)
 similarity = pickle.load(open('similarity.pkl' , 'rb'))
-st.title('Movie Recommendation System')
+
+with open('style.css') as f:
+    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    st.title('Movie Recommendation System')
+
 
 filename = 'model2.pkl'
 clf = pickle.load(open(filename, 'rb'))
@@ -213,6 +223,7 @@ vectorizer = pickle.load(open('vectorizer.pkl','rb'))
 selected_movie = st.selectbox(
     'Which Movie Do you like?',
      movies['title'].values)
+
 
 
 # This function takes a list of genres and returns a list of genre names
@@ -293,7 +304,7 @@ if st.button('Search'):
 
 
             # Plotting the bar graph
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(dpi=50)
             ax.bar(['Positive', 'Negative'], [pos_count, neg_count])
             ax.set_title('Sentiment Analysis of Reviews')
             ax.set_xlabel('Sentiment')
@@ -303,11 +314,17 @@ if st.button('Search'):
             # Create a dataframe from the reviews dictionary
             df = pd.DataFrame.from_dict((re4view), orient='index', columns=['Sentiment'])
 
+            # Display the reviews in a table
             # Display the dataframe in Streamlit
             st.write("Reviews:")
-            st.table(df.style.highlight_max(axis=0))
+            styled_table = df.style.set_table_styles([{'selector': 'tr', 'props': [('background-color', 'white')]},
+                                                      {'selector': 'th', 'props': [('background-color', 'lightgrey')]},
+                                                      {'selector': 'td', 'props': [('color', 'black')]}])
+            styled_table.highlight_max(axis=0)
+            st.table(styled_table)
         else:
             st.write("No reviews found for this movie.")
+
 
         st.title("")
 
@@ -348,28 +365,6 @@ if st.button('Search'):
 
 
 
-        import streamlit as st
-
-        # Add a social sharing menu
-        def add_share_menu():
-            url = selected_movie # Replace with your app URL
-            twitter_text = 'Check out this cool movie' # Replace with your Twitter message
-            whatsapp_text = 'Check out this cool movie: {}'.format(url) # Replace with your WhatsApp message
-
-            st.sidebar.subheader('Share')
-            st.sidebar.write('Share this app with your friends and colleagues:')
-            tweet_btn = st.sidebar.button(label='Twitter')
-            if tweet_btn:
-                tweet_url = 'https://twitter.com/intent/tweet?text={}&url={}'.format(twitter_text, url)
-                st.sidebar.markdown('[![Tweet](https://img.shields.io/twitter/url?style=social&url={})]({})'.format(tweet_url, tweet_url), unsafe_allow_html=True)
-
-            whatsapp_btn = st.sidebar.button(label='WhatsApp')
-            if whatsapp_btn:
-                whatsapp_url = 'https://wa.me/?text={}'.format(whatsapp_text)
-                st.sidebar.markdown('[![WhatsApp](https://img.shields.io/badge/WhatsApp-Chat-green?style=social&logo=whatsapp)]({})'.format(whatsapp_url), unsafe_allow_html=True)
-
-        # Add the social sharing menu to your app
-        add_share_menu()
 
 
 import os
@@ -442,5 +437,27 @@ else:
 
 
 
+import streamlit as st
+
+# Add a social sharing menu
+def add_share_menu():
+    url = selected_movie # Replace with your app URL
+    twitter_text = 'Check out this cool movie' # Replace with your Twitter message
+    whatsapp_text = 'Check out this cool movie: {}'.format(url) # Replace with your WhatsApp message
+
+    st.sidebar.subheader('Share')
+    st.sidebar.write('Share this app with your friends and colleagues:')
+    tweet_btn = st.sidebar.button(label='Twitter')
+    if tweet_btn:
+        tweet_url = 'https://twitter.com/intent/tweet?text={}&url={}'.format(twitter_text, url)
+        st.sidebar.markdown('[![Tweet](https://img.shields.io/twitter/url?style=social&url={})]({})'.format(tweet_url, tweet_url), unsafe_allow_html=True)
+
+    whatsapp_btn = st.sidebar.button(label='WhatsApp')
+    if whatsapp_btn:
+        whatsapp_url = 'https://wa.me/?text={}'.format(whatsapp_text)
+        st.sidebar.markdown('[![WhatsApp](https://img.shields.io/badge/WhatsApp-Chat-green?style=social&logo=whatsapp)]({})'.format(whatsapp_url), unsafe_allow_html=True)
+
+# Add the social sharing menu to your app
+add_share_menu()
 
 
