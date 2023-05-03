@@ -28,7 +28,7 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-    color: ghostwhite;
+    color: darkgoldenrod;
     text-align: center;
     font-size: 48px;
     margin-top: 50px;
@@ -39,7 +39,7 @@ p {
     font-size: 18px;
     line-height: 1.6;
     margin-bottom: 10px;
-    color: ghostwhite;
+    color: darkgoldenrod;
 }
 
 .movie-poster {
