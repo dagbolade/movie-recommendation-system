@@ -6,7 +6,7 @@
     font-size: 30px;
 }
 .stApp.streamlit-wide {
-    background-image: linear-gradient(rgba(0, 0, 0, 0.3),rgba(0, 0, 0, 0.3)), url("https://images.unsplash.com/photo-1509347528160-9a9e33742cdb?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8OHx8bW92aWUlMjBwb3N0ZXJ8ZW58MHx8MHx8&auto=format&fit=crop&w=500&q=60");
+    background-image: linear-gradient(rgba(0, 0, 0, 0.19),rgba(0, 0, 0, 0.3)), url("https://images.unsplash.com/photo-1509347528160-9a9e33742cdb?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8OHx8bW92aWUlMjBwb3N0ZXJ8ZW58MHx8MHx8&auto=format&fit=crop&w=500&q=60");
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -39,7 +39,7 @@ p {
     font-size: 18px;
     line-height: 1.6;
     margin-bottom: 10px;
-    color: cornflowerblue;
+    color: ghostwhite;
 }
 
 .movie-poster {
