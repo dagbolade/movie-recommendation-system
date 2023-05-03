@@ -31,38 +31,49 @@ def crew(movie_id):
     crew_name = []
     final_cast = []
     k = 0
-    for i in data["cast"]:
-        if k != 6 and i['profile_path'] is not None:
-            crew_name.append(i['name'])
-            final_cast.append("https://image.tmdb.org/t/p/w500/" + i['profile_path'])
-            k+=1
-        else:
-            break
-    return crew_name , final_cast
+    if 'cast' in data:
+        for i in data["cast"]:
+            if k != 6 and i['profile_path'] is not None:
+                crew_name.append(i['name'])
+                final_cast.append("https://image.tmdb.org/t/p/w500/" + i['profile_path'])
+                k += 1
+            else:
+                break
+    return crew_name, final_cast
 
 
 
 def date(movie_id):
     response = requests.get(
-        "https://api.themoviedb.org/3/movie/{}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
+        "https://api.themoviedb.org/3/movie/{0}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
             movie_id))
     data = response.json()
-    return data['release_date']
+    if 'release_date' in data:
+        return data['release_date']
+    else:
+        return "Release date not available"
 
 
 def genres(movie_id):
     response = requests.get(
-        "https://api.themoviedb.org/3/movie/{}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
+        "https://api.themoviedb.org/3/movie/{0}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
             movie_id))
     data = response.json()
-    return data['genres']
+    if 'genres' in data:
+        return data['genres']
+    else:
+        return []
 
 def overview(movie_id):
     response = requests.get(
-        "https://api.themoviedb.org/3/movie/{}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
+        "https://api.themoviedb.org/3/movie/{0}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
             movie_id))
     data = response.json()
-    return data['overview']
+    if 'overview' in data:
+        return data['overview']
+    else:
+        return "Overview not available"
+
 
 def poster(movie_id):
     response = requests.get("https://api.themoviedb.org/3/movie/{}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(movie_id))
@@ -74,9 +85,15 @@ def poster(movie_id):
 
 
 def rating(movie_id):
-    response = requests.get("https://api.themoviedb.org/3/movie/{}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(movie_id))
+    response = requests.get(
+        "https://api.themoviedb.org/3/movie/{0}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
+            movie_id))
     data = response.json()
-    return data['vote_average']
+    if 'vote_average' in data:
+        return data['vote_average']
+    else:
+        return "Rating not available"
+
 
 
 def review(movie_id):
@@ -143,9 +160,15 @@ def get_reviews(movie_id):
 
 
 def trailer(movie_id):
-    response = requests.get("https://api.themoviedb.org/3/movie/{}/videos?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(movie_id))
+    response = requests.get(
+        "https://api.themoviedb.org/3/movie/{0}/videos?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
+            movie_id))
     data = response.json()
-    return data['results'][0]['key']
+    if 'results' in data and data['results']:
+        return data['results'][0]['key']
+    else:
+        return "Trailer not available"
+
 
 
 
@@ -247,9 +270,13 @@ if st.button('Search'):
 
         # Display the movie details in a header and two columns
         st.header(selected_movie)
-        col_1 , col_2 = st.columns(2)
+        col_1, col_2 = st.columns(2)
         with col_1:
-            st.image(posters[0] , width=  325 , use_column_width= 325)
+            if posters:
+                st.image(posters[0], width=325, use_column_width=325)
+            else:
+                st.write("Poster not available")
+
         with col_2:
             st.write("Title : {} ".format(ans[0]))
 
@@ -441,25 +468,31 @@ else:
 
 import streamlit as st
 
-# Add a social sharing menu
-def add_share_menu():
-    url = selected_movie # Replace with your app URL
-    twitter_text = 'Check out this cool movie' # Replace with your Twitter message
-    whatsapp_text = 'Check out this cool movie: {}'.format(url) # Replace with your WhatsApp message
+# Add social sharing buttons
+import urllib.parse
+
+def add_social_buttons(selected_movie):
+    url = selected_movie
+    twitter_text = 'Check out this cool movie'
+    whatsapp_text = 'Check out this cool movie: {}'.format(url)
+    whatsapp_text_encoded = urllib.parse.quote(whatsapp_text)
+    twitter_text_encoded = urllib.parse.quote(twitter_text)
 
     st.sidebar.subheader('Share')
     st.sidebar.write('Share this app with your friends and colleagues:')
+
     tweet_btn = st.sidebar.button(label='Twitter')
     if tweet_btn:
-        tweet_url = 'https://twitter.com/intent/tweet?text={}&url={}'.format(twitter_text, url)
+        tweet_url = 'https://twitter.com/intent/tweet?text={}&url={}'.format(twitter_text_encoded, url)
         st.sidebar.markdown('[![Tweet](https://img.shields.io/twitter/url?style=social&url={})]({})'.format(tweet_url, tweet_url), unsafe_allow_html=True)
 
     whatsapp_btn = st.sidebar.button(label='WhatsApp')
     if whatsapp_btn:
-        whatsapp_url = 'https://wa.me/?text={}'.format(whatsapp_text)
-        st.sidebar.markdown('[![WhatsApp](https://img.shields.io/badge/WhatsApp-Chat-green?style=social&logo=whatsapp)]({})'.format(whatsapp_url), unsafe_allow_html=True)
+        whatsapp_url = 'https://wa.me/?text={}'.format(whatsapp_text_encoded, url)
+        st.sidebar.markdown('[![WhatsApp](https://img.shields.io/badge/WhatsApp-Chat-green?style=social&logo=whatsapp&alt=Share%20on%20WhatsApp)]({})'.format(whatsapp_url), unsafe_allow_html=True)
 
-# Add the social sharing menu to your app
-add_share_menu()
+
+# Add the social sharing menu to the app
+add_social_buttons(selected_movie)
 
 
