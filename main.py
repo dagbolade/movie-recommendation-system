@@ -81,7 +81,7 @@ def poster(movie_id):
     if 'poster_path' in data:
         return "https://image.tmdb.org/t/p/w500/" + data['poster_path']
     else:
-        return None
+        return ""
 
 
 def rating(movie_id):
@@ -213,11 +213,17 @@ def recommend(movie):
 
         # Loop through recommended movies to store their details
         for i in recommended_movies:
-            # Store recommended movie title
-            final.append(movies.iloc[i[0]].title)
+            # Store recommended movie title, rating, and score
+            title = movies.iloc[i[0]].title
+            ratingg = rating(movies.iloc[i[0]].movie_id)
+            score = round(i[1], 2)
+            final.append(f"{title} (Rating: {ratingg}) - Similarity score: {score}")
+
 
             # Store recommended movie poster
             final_posters.append(poster(movies.iloc[i[0]].movie_id))
+
+
 
         # Return all details
         return final_name , final_cast , rel_date , gen , overview_final , final , final_posters, ratings, re4view, rev, trailer_final
