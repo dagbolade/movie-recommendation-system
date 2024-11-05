@@ -10,6 +10,10 @@ import pickle
 import requests
 from datetime import date, datetime
 import matplotlib.pyplot as plt
+from collections import Counter
+import plotly.express as px
+from datetime import datetime
+import plotly.graph_objects as go
 
 
 st.set_page_config(page_title="Recommender system", layout="wide")
@@ -170,6 +174,157 @@ def trailer(movie_id):
         return "Trailer not available"
 
 
+def get_movie_revenue(movie_id):
+    """Get movie revenue and budget information"""
+    response = requests.get(
+        f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US"
+    )
+    data = response.json()
+    return {
+        'revenue': data.get('revenue', 0),
+        'budget': data.get('budget', 0),
+        'profit': data.get('revenue', 0) - data.get('budget', 0)
+    }
+
+
+def get_similar_movies_by_decade(movie):
+    """Get similar movies grouped by decade"""
+    movie_index = movies[movies['title'] == movie].index[0]
+    cosine_angles = similarity[movie_index]
+    recommended_movies = sorted(list(enumerate(cosine_angles)), reverse=True, key=lambda x: x[1])[0:20]
+
+    decade_groups = {}
+    for i in recommended_movies:
+        movie_id = movies.iloc[i[0]].movie_id
+        release_date = date(movie_id)
+        try:
+            decade = int(release_date[:4]) // 10 * 10
+            if decade not in decade_groups:
+                decade_groups[decade] = []
+            decade_groups[decade].append({
+                'title': movies.iloc[i[0]].title,
+                'similarity': round(i[1], 2),
+                'year': release_date[:4]
+            })
+        except:
+            continue
+    return decade_groups
+
+
+def analyze_genre_distribution(movie, similar_movies):
+    """Analyze genre distribution among similar movies"""
+    genre_counts = Counter()
+    for movie_data in similar_movies:
+        movie_index = movies[movies['title'] == movie_data['title']].index[0]
+        movie_id = movies.iloc[movie_index].movie_id
+        movie_genres = genres(movie_id)
+        for genre in movie_genres:
+            genre_counts[genre['name']] += 1
+    return dict(genre_counts)
+
+
+def create_interactive_timeline(movie, similarity):
+    """Create an improved interactive timeline of similar movies"""
+    # Get base movie details
+    movie_index = movies[movies['title'] == movie].index[0]
+    cosine_angles = similarity[movie_index]
+
+    # Get top 15 similar movies
+    recommended_movies = sorted(list(enumerate(cosine_angles)), reverse=True, key=lambda x: x[1])[1:16]
+
+    timeline_data = []
+    for idx, sim_score in recommended_movies:
+        movie_id = movies.iloc[idx].movie_id
+        release_date_str = date(movie_id)
+
+        try:
+            # Parse release date
+            release_date = datetime.strptime(release_date_str, '%Y-%m-%d')
+
+            timeline_data.append({
+                'title': movies.iloc[idx].title,
+                'year': release_date.year,
+                'similarity': round(sim_score * 100, 1),  # Convert to percentage
+                'rating': rating(movie_id)
+            })
+        except (ValueError, TypeError):
+            continue
+
+    # Create timeline visualization using plotly
+    fig = px.scatter(
+        timeline_data,
+        x='year',
+        y='similarity',
+        size='rating',  # Size points by rating
+        hover_data=['title', 'rating'],
+        labels={
+            'year': 'Release Year',
+            'similarity': 'Similarity Score (%)',
+            'rating': 'Movie Rating'
+        },
+        title=f'Similar Movies to "{movie}" Across Time'
+    )
+
+    # Customize the layout
+    fig.update_traces(
+        marker=dict(color='#1f77b4'),
+        hovertemplate="<br>".join([
+            "Movie: %{customdata[0]}",
+            "Year: %{x}",
+            "Similarity: %{y}%",
+            "Rating: %{customdata[1]}/10",
+            "<extra></extra>"
+        ])
+    )
+
+    fig.update_layout(
+        plot_bgcolor='white',
+        width=800,
+        height=500,
+        xaxis=dict(
+            gridcolor='lightgray',
+            title_font=dict(size=14),
+            tickmode='linear',
+            dtick=5  # Show year marks every 5 years
+        ),
+        yaxis=dict(
+            gridcolor='lightgray',
+            title_font=dict(size=14),
+            range=[0, 100]  # Set y-axis range from 0-100%
+        )
+    )
+
+    return fig
+
+
+def get_watch_providers(movie_id):
+    """Get streaming/watch providers for the movie"""
+    response = requests.get(
+        f"https://api.themoviedb.org/3/movie/{movie_id}/watch/providers?api_key=4158f8d4403c843543d3dc953f225d77"
+    )
+    data = response.json()
+    providers = data.get('results', {}).get('US', {})
+    return {
+        'stream': providers.get('flatrate', []),
+        'rent': providers.get('rent', []),
+        'buy': providers.get('buy', [])
+    }
+
+
+def create_financial_analysis(movie_id):
+    """Create financial analysis visualization"""
+    financial_data = get_movie_revenue(movie_id)
+
+    fig = go.Figure(data=[
+        go.Bar(name='Budget', x=['Financial Metrics'], y=[financial_data['budget']]),
+        go.Bar(name='Revenue', x=['Financial Metrics'], y=[financial_data['revenue']]),
+        go.Bar(name='Profit', x=['Financial Metrics'], y=[financial_data['profit']])
+    ])
+
+    fig.update_layout(title='Movie Financial Analysis',
+                      barmode='group',
+                      yaxis_title='Amount in USD')
+    return fig
 
 
 def recommend(movie):
@@ -446,7 +601,67 @@ if remove_movie and selected_movie:
         f.write('\n'.join(watchlist))
     st.success(f'{selected_movie} removed from Watchlist!')
 
+# Add this to your main Streamlit interface after the existing recommendation section
+if st.button('Advanced Analysis'):
+    # Get similar movies by decade
+    decade_groups = get_similar_movies_by_decade(selected_movie)
 
+    st.header("Timeline Analysis")
+    # Flatten the decade groups for timeline
+    all_similar_movies = []
+    for decade, movies in decade_groups.items():
+        all_similar_movies.extend(movies)
+    st.subheader("Similar Movies Timeline")
+    timeline_fig = create_interactive_timeline(selected_movie, similarity)
+    st.plotly_chart(timeline_fig, use_container_width=True)
+
+    st.header("Genre Distribution")
+    genre_dist = analyze_genre_distribution(selected_movie, all_similar_movies)
+    genre_fig = px.pie(values=list(genre_dist.values()),
+                       names=list(genre_dist.keys()),
+                       title='Genre Distribution in Similar Movies')
+    st.plotly_chart(genre_fig)
+
+    st.header("Financial Analysis")
+    movie_id = movies.iloc[movies[movies['title'] == selected_movie].index[0]].movie_id
+    financial_fig = create_financial_analysis(movie_id)
+    st.plotly_chart(financial_fig)
+
+    st.header("Where to Watch")
+    providers = get_watch_providers(movie_id)
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.subheader("Stream")
+        for provider in providers['stream']:
+            st.write(provider.get('provider_name'))
+
+    with col2:
+        st.subheader("Rent")
+        for provider in providers['rent']:
+            st.write(provider.get('provider_name'))
+
+    with col3:
+        st.subheader("Buy")
+        for provider in providers['buy']:
+            st.write(provider.get('provider_name'))
+
+# Add user interaction features
+with st.sidebar:
+    st.header("Personalization")
+
+    # Genre preferences
+    st.subheader("Favorite Genres")
+    all_genres = list(set([genre['name'] for movie in movies['title'] for genre in
+                           genres(movies[movies['title'] == movie].iloc[0].movie_id)]))
+    selected_genres = st.multiselect("Select your favorite genres", all_genres)
+
+    # Release year range
+    st.subheader("Year Range")
+    year_range = st.slider("Select year range", 1900, 2024, (1900, 2024))
+
+    # Minimum rating filter
+    min_rating = st.slider("Minimum Rating", 0.0, 10.0, 5.0)
 
 
 # Display the watchlist with movie details
