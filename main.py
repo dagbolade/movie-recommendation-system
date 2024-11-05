@@ -597,25 +597,6 @@ if remove_movie and selected_movie:
     st.success(f'{selected_movie} removed from Watchlist!')
 
 
-
-# Add user interaction features
-with st.sidebar:
-    st.header("Personalization")
-
-    # Genre preferences
-    st.subheader("Favorite Genres")
-    all_genres = list(set([genre['name'] for movie in movies['title'] for genre in
-                           genres(movies[movies['title'] == movie].iloc[0].movie_id)]))
-    selected_genres = st.multiselect("Select your favorite genres", all_genres)
-
-    # Release year range
-    st.subheader("Year Range")
-    year_range = st.slider("Select year range", 1900, 2024, (1900, 2024))
-
-    # Minimum rating filter
-    min_rating = st.slider("Minimum Rating", 0.0, 10.0, 5.0)
-
-
 # Display the watchlist with movie details
 if watchlist:
     movie_data = []
@@ -668,4 +649,120 @@ def add_social_buttons(selected_movie):
 # Add the social sharing menu to the app
 add_social_buttons(selected_movie)
 
+# Add this after your social sharing buttons section
+st.markdown("---")
 
+# Movie Chatbot Section
+st.title("Movie Recommendation Chatbot")
+
+
+class SimpleMovieBot:
+    def __init__(self, movies_df, similarity):
+        self.movies_df = movies_df
+        self.similarity = similarity
+        self.moods = {
+            'happy': ['comedy', 'animation', 'family'],
+            'sad': ['drama', 'romance'],
+            'excited': ['action', 'adventure', 'sci-fi'],
+            'relaxed': ['documentary', 'family'],
+            'scared': ['horror', 'thriller']
+        }
+
+    def get_recommendations(self, input_text):
+        input_text = input_text.lower()
+
+        # Check for mood-based recommendations
+        for mood, genres in self.moods.items():
+            if mood in input_text:
+                recommendations = []
+                for _, movie in self.movies_df.iterrows():
+                    movie_genres = genres(movie.movie_id)
+                    if any(g['name'].lower() in genres for g in movie_genres):
+                        movie_rating = rating(movie.movie_id)
+                        if movie_rating > 7.0:  # Only recommend highly-rated movies
+                            recommendations.append({
+                                'title': movie.title,
+                                'rating': movie_rating,
+                                'poster': poster(movie.movie_id)
+                            })
+                            if len(recommendations) == 5:  # Limit to 5 recommendations
+                                break
+                return {
+                    'type': 'mood',
+                    'mood': mood,
+                    'recommendations': recommendations
+                }
+
+        # Check for movie similarity recommendations
+        if "like" in input_text:
+            try:
+                # Extract movie name after "like"
+                movie_name = input_text.split("like")[1].strip()
+                if movie_name in self.movies_df['title'].values:
+                    idx = self.movies_df[self.movies_df['title'] == movie_name].index[0]
+                    sim_scores = list(enumerate(self.similarity[idx]))
+                    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)[1:6]
+
+                    recommendations = []
+                    for i, score in sim_scores:
+                        recommendations.append({
+                            'title': self.movies_df.iloc[i].title,
+                            'rating': rating(self.movies_df.iloc[i].movie_id),
+                            'poster': poster(self.movies_df.iloc[i].movie_id)
+                        })
+                    return {
+                        'type': 'similar',
+                        'movie': movie_name,
+                        'recommendations': recommendations
+                    }
+            except:
+                pass
+
+        return None
+
+
+# Initialize bot
+bot = SimpleMovieBot(movies, similarity)
+
+# Chat interface
+st.markdown("""
+### How to use:
+1. Tell me your mood (e.g., "I'm feeling happy")
+2. Or tell me a movie you like (e.g., "I like The Dark Knight")
+""")
+
+# Create chat input
+user_input = st.text_input("What kind of movies would you like?", key="chat_input")
+submit_button = st.button("Get Recommendations")
+
+if submit_button and user_input:
+    recommendations = bot.get_recommendations(user_input)
+
+    if recommendations:
+        if recommendations['type'] == 'mood':
+            st.write(f"Based on your {recommendations['mood']} mood, here are some recommendations:")
+        else:
+            st.write(f"If you like {recommendations['movie']}, you might enjoy:")
+
+        # Display recommendations in columns
+        cols = st.columns(len(recommendations['recommendations']))
+        for col, movie in zip(cols, recommendations['recommendations']):
+            with col:
+                if movie['poster']:
+                    st.image(movie['poster'], width=150)
+                st.write(f"**{movie['title']}**")
+                st.write(f"Rating: {movie['rating']}/10")
+    else:
+        st.write("I couldn't understand your request. Try:\n"
+                 "- 'I'm feeling [happy/sad/excited/relaxed/scared]'\n"
+                 "- 'I like [movie name]'")
+
+# Add to watchlist option
+if st.button("Add recommended movies to watchlist"):
+    if 'recommendations' in locals() and recommendations and recommendations.get('recommendations'):
+        for movie in recommendations['recommendations']:
+            if movie['title'] not in watchlist:
+                watchlist.append(movie['title'])
+        with open(WATCHLIST_FILE, 'w') as f:
+            f.write('\n'.join(watchlist))
+        st.success("Added recommended movies to your watchlist!")
