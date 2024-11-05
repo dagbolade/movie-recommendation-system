@@ -652,117 +652,516 @@ add_social_buttons(selected_movie)
 # Add this after your social sharing buttons section
 st.markdown("---")
 
-# Movie Chatbot Section
-st.title("Movie Recommendation Chatbot")
 
-
-class SimpleMovieBot:
+class ComprehensiveMovieBot:
     def __init__(self, movies_df, similarity):
         self.movies_df = movies_df
         self.similarity = similarity
-        self.moods = {
-            'happy': ['comedy', 'animation', 'family'],
-            'sad': ['drama', 'romance'],
-            'excited': ['action', 'adventure', 'sci-fi'],
-            'relaxed': ['documentary', 'family'],
-            'scared': ['horror', 'thriller']
+
+        # Seasonal/Holiday mappings
+        self.seasonal_mappings = {
+            'christmas': {
+                'keywords': ['christmas', 'xmas', 'holiday season', 'santa', 'december 25'],
+                'genres': ['Family', 'Comedy', 'Romance'],
+                'exclude_genres': ['Horror', 'Thriller'],
+                'mood': 'festive'
+            },
+            'halloween': {
+                'keywords': ['halloween', 'spooky', 'october 31', 'trick or treat'],
+                'genres': ['Horror', 'Thriller', 'Mystery'],
+                'mood': 'scary'
+            },
+            'valentine': {
+                'keywords': ['valentine', 'february 14', 'date night', 'romantic evening'],
+                'genres': ['Romance', 'Drama', 'Comedy'],
+                'mood': 'romantic'
+            },
+            'easter': {
+                'keywords': ['easter', 'spring holiday', 'easter bunny'],
+                'genres': ['Family', 'Animation', 'Adventure'],
+                'mood': 'uplifting'
+            },
+            'summer': {
+                'keywords': ['summer', 'beach', 'vacation', 'summer break'],
+                'genres': ['Action', 'Adventure', 'Comedy'],
+                'mood': 'fun'
+            },
+            'thanksgiving': {
+                'keywords': ['thanksgiving', 'november', 'turkey day'],
+                'genres': ['Family', 'Drama', 'Comedy'],
+                'mood': 'heartwarming'
+            }
         }
 
-    def get_recommendations(self, input_text):
-        input_text = input_text.lower()
+        # Special categories
+        self.special_categories = {
+            'family night': {
+                'genres': ['Family', 'Animation', 'Adventure'],
+                'min_rating': 7.0,
+                'exclude_genres': ['Horror', 'Thriller']
+            },
+            'date night': {
+                'genres': ['Romance', 'Comedy', 'Drama'],
+                'min_rating': 7.5
+            },
+            'movie marathon': {
+                'duration': 'long',
+                'min_rating': 8.0,
+                'series': True
+            },
+            'classic movies': {
+                'year_range': (1900, 1980),
+                'min_rating': 7.5
+            },
+            'award winners': {
+                'min_rating': 8.0,
+                'awards': True
+            },
+            'hidden gems': {
+                'rating_range': (7.0, 8.5),
+                'popularity': 'low'
+            }
+        }
 
-        # Check for mood-based recommendations
-        for mood, genres in self.moods.items():
-            if mood in input_text:
-                recommendations = []
-                for _, movie in self.movies_df.iterrows():
-                    movie_genres = genres(movie.movie_id)
-                    if any(g['name'].lower() in genres for g in movie_genres):
-                        movie_rating = rating(movie.movie_id)
-                        if movie_rating > 7.0:  # Only recommend highly-rated movies
-                            recommendations.append({
-                                'title': movie.title,
-                                'rating': movie_rating,
-                                'poster': poster(movie.movie_id)
-                            })
-                            if len(recommendations) == 5:  # Limit to 5 recommendations
-                                break
-                return {
-                    'type': 'mood',
-                    'mood': mood,
-                    'recommendations': recommendations
-                }
+        # Age ratings and content filters
+        self.age_ratings = {
+            'kids': {
+                'genres': ['Family', 'Animation'],
+                'exclude_genres': ['Horror', 'Thriller'],
+                'max_rating': 'PG'
+            },
+            'teens': {
+                'genres': ['Action', 'Adventure', 'Comedy'],
+                'max_rating': 'PG-13'
+            },
+            'adults': {
+                'all_genres': True,
+                'include_rating': 'R'
+            }
+        }
 
-        # Check for movie similarity recommendations
-        if "like" in input_text:
-            try:
-                # Extract movie name after "like"
-                movie_name = input_text.split("like")[1].strip()
-                if movie_name in self.movies_df['title'].values:
-                    idx = self.movies_df[self.movies_df['title'] == movie_name].index[0]
-                    sim_scores = list(enumerate(self.similarity[idx]))
-                    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)[1:6]
+        # Adding existing mood and genre mappings
+        self.mood_mappings = {
+            'happy': ['happy', 'cheerful', 'joyful', 'upbeat', 'fun', 'good', 'positive'],
+            'sad': ['sad', 'depressed', 'down', 'blue', 'melancholy', 'emotional'],
+            'excited': ['excited', 'thrilled', 'energetic', 'pumped', 'adventurous'],
+            'relaxed': ['relaxed', 'calm', 'peaceful', 'chill', 'quiet', 'lazy'],
+            'scared': ['scared', 'frightened', 'spooky', 'horror', 'terrifying'],
+            'romantic': ['romantic', 'love', 'romance', 'relationship'],
+            'thoughtful': ['thoughtful', 'deep', 'meaningful', 'serious', 'intelligent'],
+            'angry': ['angry', 'mad', 'furious', 'rage', 'vengeful']
+        }
 
-                    recommendations = []
-                    for i, score in sim_scores:
+    def get_movie_info(self, movie_id):
+        """Get comprehensive movie information with better error handling"""
+        try:
+            movie_rating = rating(movie_id)
+            # Convert rating to float if possible, otherwise keep as is
+            if isinstance(movie_rating, (int, float)) or (
+                    isinstance(movie_rating, str) and movie_rating.replace('.', '').isdigit()):
+                movie_rating = float(movie_rating)
+
+            return {
+                'genres': genres(movie_id),
+                'rating': movie_rating,
+                'poster': poster(movie_id),
+                'overview': overview(movie_id),
+                'release_date': date(movie_id),
+                'trailer': trailer(movie_id),
+                'cast': crew(movie_id)[0],
+                'watch_providers': get_watch_providers(movie_id)
+            }
+        except Exception as e:
+            print(f"Error getting movie info: {str(e)}")
+            return None
+
+    # get mood based recommendations
+    def get_mood_based_recommendations(self, mood):
+        """Get recommendations based on mood"""
+        recommendations = []
+        try:
+            # Get the preferred genres for this mood
+            preferred_genres = []
+            if mood in self.mood_mappings:
+                # Map mood to genre preferences
+                if mood == 'happy':
+                    preferred_genres = ['Comedy', 'Animation', 'Family', 'Musical']
+                elif mood == 'sad':
+                    preferred_genres = ['Drama', 'Romance']
+                elif mood == 'excited':
+                    preferred_genres = ['Action', 'Adventure', 'Science Fiction', 'Thriller']
+                elif mood == 'relaxed':
+                    preferred_genres = ['Documentary', 'Family', 'Comedy']
+                elif mood == 'romantic':
+                    preferred_genres = ['Romance', 'Drama', 'Comedy']
+                elif mood == 'thoughtful':
+                    preferred_genres = ['Drama', 'Documentary', 'History']
+
+            # Get recommendations based on preferred genres
+            for _, movie in self.movies_df.iterrows():
+                movie_info = self.get_movie_info(movie.movie_id)
+                movie_genres = [g['name'] for g in movie_info['genres']]
+
+                if any(genre in movie_genres for genre in preferred_genres):
+                    if isinstance(movie_info['rating'], (int, float)) and movie_info['rating'] > 7.0:
                         recommendations.append({
-                            'title': self.movies_df.iloc[i].title,
-                            'rating': rating(self.movies_df.iloc[i].movie_id),
-                            'poster': poster(self.movies_df.iloc[i].movie_id)
+                            'title': movie.title,
+                            'info': movie_info
                         })
-                    return {
-                        'type': 'similar',
-                        'movie': movie_name,
-                        'recommendations': recommendations
-                    }
-            except:
-                pass
+
+                if len(recommendations) >= 5:
+                    break
+
+            return recommendations
+        except Exception as e:
+            print(f"Error in mood recommendations: {str(e)}")
+            return []
+
+    def detect_category(self, text):
+        """Detect category from user input with improved matching"""
+        text = text.lower().strip()
+
+        # Check for direct mood mentions
+        for mood, keywords in self.mood_mappings.items():
+            if any(keyword in text for keyword in keywords):
+                return {'type': 'mood', 'category': mood}
+
+        # Check for seasonal/holiday matches
+        for season, data in self.seasonal_mappings.items():
+            if any(keyword in text for keyword in data['keywords']):
+                return {'type': 'seasonal', 'category': season}
+
+        # Check for special categories
+        for category in self.special_categories.keys():
+            if category in text:
+                return {'type': 'special', 'category': category}
+
+        # Check for age ratings
+        for age in self.age_ratings.keys():
+            if age in text:
+                return {'type': 'age', 'category': age}
 
         return None
 
+    def get_recommendations(self, user_input):
+        """Get movie recommendations based on user input"""
+        try:
+            # Add debug prints
+            print(f"Processing input: {user_input}")
 
-# Initialize bot
-bot = SimpleMovieBot(movies, similarity)
+            user_input = user_input.lower().strip()
+            category = self.detect_category(user_input)
 
-# Chat interface
-st.markdown("""
-### How to use:
-1. Tell me your mood (e.g., "I'm feeling happy")
-2. Or tell me a movie you like (e.g., "I like The Dark Knight")
-""")
+            print(f"Detected category: {category}")
 
-# Create chat input
-user_input = st.text_input("What kind of movies would you like?", key="chat_input")
-submit_button = st.button("Get Recommendations")
+            recommendations = []
 
-if submit_button and user_input:
-    recommendations = bot.get_recommendations(user_input)
+            if category:
+                print(f"Getting recommendations for category: {category['type']}")
+                if category['type'] == 'mood':
+                    recommendations = self.get_mood_based_recommendations(category['category'])
+                elif category['type'] == 'seasonal':
+                    season_data = self.seasonal_mappings[category['category']]
+                    recommendations = self.get_seasonal_recommendations(season_data)
+                elif category['type'] == 'special':
+                    special_data = self.special_categories[category['category']]
+                    recommendations = self.get_special_recommendations(special_data)
+                elif category['type'] == 'age':
+                    age_data = self.age_ratings[category['category']]
+                    recommendations = self.get_age_based_recommendations(age_data)
 
-    if recommendations:
-        if recommendations['type'] == 'mood':
-            st.write(f"Based on your {recommendations['mood']} mood, here are some recommendations:")
-        else:
-            st.write(f"If you like {recommendations['movie']}, you might enjoy:")
+                print(f"Found {len(recommendations)} recommendations")
+
+                valid_recommendations = []
+                for rec in recommendations:
+                    if isinstance(rec, dict) and 'title' in rec and 'info' in rec:
+                        valid_recommendations.append(rec)
+                    if len(valid_recommendations) >= 5:
+                        break
+
+                return {
+                    'type': category['type'],
+                    'category': category['category'],
+                    'recommendations': valid_recommendations
+                }
+            else:
+                print("No category detected, trying genre matching")
+                # Try to match with general genre keywords
+                general_genres = ['action', 'comedy', 'drama', 'horror', 'romance', 'family']
+                for genre in general_genres:
+                    if genre in user_input:
+                        recommendations = self.get_special_recommendations({
+                            'genres': [genre.title()],
+                            'min_rating': 7.0
+                        })
+                        return {
+                            'type': 'genre',
+                            'category': genre,
+                            'recommendations': recommendations[:5]
+                        }
+
+                return {
+                    'type': 'unknown',
+                    'category': None,
+                    'recommendations': []
+                }
+
+        except Exception as e:
+            print(f"Error in recommendations: {str(e)}")
+            return {
+                'type': 'error',
+                'category': None,
+                'recommendations': []
+            }
+    def get_seasonal_recommendations(self, season_data):
+        """Get recommendations for seasonal/holiday movies"""
+        recommendations = []
+        for _, movie in self.movies_df.iterrows():
+            movie_info = self.get_movie_info(movie.movie_id)
+            movie_genres = [g['name'] for g in movie_info['genres']]
+
+            # Check if movie matches seasonal criteria
+            if (any(g in season_data['genres'] for g in movie_genres) and
+                    not any(g in season_data.get('exclude_genres', []) for g in movie_genres)):
+
+                if isinstance(movie_info['rating'], (int, float)) and movie_info['rating'] > 7.0:
+                    recommendations.append({
+                        'title': movie.title,
+                        'info': movie_info
+                    })
+
+        return sorted(recommendations, key=lambda x: x['info']['rating'], reverse=True)
+
+    def get_special_recommendations(self, special_data):
+        """Get recommendations for special categories with improved error handling"""
+        recommendations = []
+        try:
+            for _, movie in self.movies_df.iterrows():
+                try:
+                    movie_info = self.get_movie_info(movie.movie_id)
+                    if movie_info is None:
+                        continue
+
+                    if self.matches_special_criteria(movie_info, special_data):
+                        recommendations.append({
+                            'title': movie.title,
+                            'info': movie_info
+                        })
+
+                        if len(recommendations) >= 5:
+                            break
+
+                except Exception as e:
+                    print(f"Error processing movie {movie.title}: {str(e)}")
+                    continue
+
+            # Sort recommendations by rating, handling non-numeric ratings
+            def get_rating(rec):
+                rating = rec['info']['rating']
+                if rating == "Rating not available":
+                    return 0
+                try:
+                    return float(rating)
+                except (ValueError, TypeError):
+                    return 0
+
+            return sorted(recommendations, key=get_rating, reverse=True)
+
+        except Exception as e:
+            print(f"Error in get_special_recommendations: {str(e)}")
+            return []
+
+    def matches_special_criteria(self, movie_info, criteria):
+        """Check if movie matches special category criteria with improved error handling"""
+        try:
+            # Handle minimum rating check
+            if 'min_rating' in criteria:
+                movie_rating = movie_info['rating']
+
+                # Skip movies with no rating
+                if movie_rating == "Rating not available":
+                    return False
+
+                try:
+                    # Convert rating to float and compare
+                    movie_rating = float(movie_rating)
+                    if movie_rating < float(criteria['min_rating']):
+                        return False
+                except (ValueError, TypeError):
+                    # If rating can't be converted to float, skip this movie
+                    return False
+
+            # Handle year range check
+            if 'year_range' in criteria:
+                release_date = movie_info['release_date']
+                if release_date == "Release date not available":
+                    return False
+
+                try:
+                    release_year = int(release_date[:4])
+                    year_range = criteria['year_range']
+                    if not (year_range[0] <= release_year <= year_range[1]):
+                        return False
+                except (ValueError, TypeError, IndexError):
+                    return False
+
+            # Handle genre requirements
+            if 'genres' in criteria:
+                movie_genres = [g['name'] for g in movie_info.get('genres', [])]
+                if not any(g in criteria['genres'] for g in movie_genres):
+                    return False
+
+            # Handle excluded genres
+            if 'exclude_genres' in criteria:
+                movie_genres = [g['name'] for g in movie_info.get('genres', [])]
+                if any(g in criteria['exclude_genres'] for g in movie_genres):
+                    return False
+
+            return True
+
+        except Exception as e:
+            print(f"Error in matches_special_criteria: {str(e)}")
+            return False
+
+    def get_age_based_recommendations(self, age_data):
+        """Get recommendations based on age rating"""
+        recommendations = []
+        for _, movie in self.movies_df.iterrows():
+            movie_info = self.get_movie_info(movie.movie_id)
+            movie_genres = [g['name'] for g in movie_info['genres']]
+
+            if (any(g in age_data['genres'] for g in movie_genres) and
+                    not any(g in age_data.get('exclude_genres', []) for g in movie_genres)):
+                recommendations.append({
+                    'title': movie.title,
+                    'info': movie_info
+                })
+
+        return sorted(recommendations, key=lambda x: x['info']['rating'], reverse=True)
+
+def display_recommendations(result):
+    """Helper function to display movie recommendations with better error handling"""
+    try:
+        if result['type'] == 'error':
+            st.error("An error occurred while getting recommendations. Please try again.")
+            return
+
+        if not result.get('recommendations'):
+            st.warning(f"No recommendations found for {result.get('category', 'your request')}. Try another category!")
+            return
+
+        st.subheader(f"Here are your {result.get('category', '')} recommendations:")
 
         # Display recommendations in columns
-        cols = st.columns(len(recommendations['recommendations']))
-        for col, movie in zip(cols, recommendations['recommendations']):
+        cols = st.columns(min(len(result['recommendations']), 5))
+        for col, rec in zip(cols, result['recommendations']):
             with col:
-                if movie['poster']:
-                    st.image(movie['poster'], width=150)
-                st.write(f"**{movie['title']}**")
-                st.write(f"Rating: {movie['rating']}/10")
-    else:
-        st.write("I couldn't understand your request. Try:\n"
-                 "- 'I'm feeling [happy/sad/excited/relaxed/scared]'\n"
-                 "- 'I like [movie name]'")
+                try:
+                    if rec['info'].get('poster'):
+                        st.image(rec['info']['poster'], width=150)
+                    st.write(f"**{rec['title']}**")
 
-# Add to watchlist option
-if st.button("Add recommended movies to watchlist"):
-    if 'recommendations' in locals() and recommendations and recommendations.get('recommendations'):
-        for movie in recommendations['recommendations']:
-            if movie['title'] not in watchlist:
-                watchlist.append(movie['title'])
-        with open(WATCHLIST_FILE, 'w') as f:
-            f.write('\n'.join(watchlist))
-        st.success("Added recommended movies to your watchlist!")
+                    # Safely handle rating display
+                    rating_value = rec['info'].get('rating')
+                    if rating_value == "Rating not available":
+                        st.write("Rating: Not available")
+                    elif rating_value and isinstance(rating_value, (int, float)):
+                        st.write(f"Rating: {float(rating_value):.1f}/10")
+                    else:
+                        st.write(f"Rating: {rating_value}")
+
+                    with st.expander("More Info"):
+                        st.write("**Overview:**")
+                        st.write(rec['info'].get('overview', 'No overview available'))
+
+                        genres = rec['info'].get('genres', [])
+                        if genres:
+                            st.write("**Genres:**")
+                            st.write(", ".join([g['name'] for g in genres]))
+
+                        # Safely handle watch providers
+                        providers = rec['info'].get('watch_providers', {})
+                        if providers and providers.get('stream'):
+                            st.write("**Where to Stream:**")
+                            st.write(", ".join([p['provider_name'] for p in providers['stream']]))
+
+                except Exception as e:
+                    st.error(f"Error displaying movie: {str(e)}")
+                    continue
+
+    except Exception as e:
+        st.error(f"Error displaying recommendations: {str(e)}")
+
+
+st.markdown("---")
+st.title("Smart Movie Recommendation Bot")
+
+# Initialize bot once
+bot = ComprehensiveMovieBot(movies, similarity)
+
+# Create tabs for different recommendation types
+tab1, tab2, tab3 = st.tabs(["Quick Recommendations", "Seasonal & Special", "Mood Based"])
+
+with tab1:
+    st.markdown("""
+    ### Quick Movie Recommendations
+    Tell me what kind of movies you're looking for:
+    - Specific genre (e.g., "action movies")
+    - Age group (e.g., "kids movies")
+    - Special category (e.g., "classic movies")
+    """)
+
+    quick_input = st.text_input("What kind of movies would you like?", key="quick_input")
+    if st.button("Get Quick Recommendations"):
+        if quick_input:
+            bot = ComprehensiveMovieBot(movies, similarity)
+            result = bot.get_recommendations(quick_input)
+            if result and result['recommendations']:
+                display_recommendations(result)
+            else:
+                st.warning("No recommendations found. Try a different category!")
+
+with tab2:
+    st.markdown("""
+    ### Seasonal & Special Recommendations
+    Choose a category:
+    """)
+
+    season_options = [
+        "Christmas Movies", "Halloween Movies", "Valentine's Day Movies",
+        "Summer Blockbusters", "Family Movie Night", "Date Night Movies"
+    ]
+
+    selected_category = st.selectbox("Select a category:", season_options)
+    if st.button("Get Seasonal Recommendations"):
+        bot = ComprehensiveMovieBot(movies, similarity)
+        result = bot.get_recommendations(selected_category.lower())
+        if result and result['recommendations']:
+            display_recommendations(result)
+        else:
+            st.warning("No recommendations found for this category.")
+
+with tab3:
+    st.markdown("""
+    ### Mood Based Recommendations
+    How are you feeling today?
+    """)
+
+    mood_options = [
+        "Happy", "Sad", "Excited", "Relaxed", "Romantic",
+        "Thoughtful", "Energetic", "Calm"
+    ]
+
+    selected_mood = st.selectbox("Select your mood:", mood_options)
+    if st.button("Get Mood Recommendations"):
+        bot = ComprehensiveMovieBot(movies, similarity)
+        result = bot.get_recommendations(selected_mood.lower())
+        if result and result['recommendations']:
+            display_recommendations(result)
+        else:
+            st.warning("No recommendations found for this mood.")
+
+
+# Add clear all button at the bottom
+if st.button("Clear All", key="clear_all"):
+    st.experimental_rerun()
