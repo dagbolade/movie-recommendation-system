@@ -9,16 +9,33 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import json
 import pickle
-import requests
 from datetime import date, datetime
 import matplotlib.pyplot as plt
 from collections import Counter
 import plotly.express as px
-from datetime import datetime
+
 import plotly.graph_objects as go
 
 
 st.set_page_config(page_title="Recommender system", layout="wide")
+
+# Initialize ALL session states at the very top of your code
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = 0
+if 'watchlist' not in st.session_state:
+    st.session_state.watchlist = []
+if 'skipped_movies' not in st.session_state:
+    st.session_state.skipped_movies = set()
+if 'last_recommendations' not in st.session_state:
+    st.session_state.last_recommendations = None
+if 'current_tab' not in st.session_state:
+    st.session_state.current_tab = "Quick"
+if 'recommendation_offset' not in st.session_state:
+    st.session_state.recommendation_offset = 0
+if 'last_recommendation' not in st.session_state:
+    st.session_state.last_recommendation = None
+if 'selected_movie' not in st.session_state:
+    st.session_state.selected_movie = None
 
 
 # add styling
@@ -26,79 +43,144 @@ with open('style.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
 
-
 @st.cache_data
-# Functions for getting movie information from TMDB API
-def crew(movie_id):
-    response = requests.get(
-        "https://api.themoviedb.org/3/movie/{0}/credits?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
-            movie_id))
-    data = response.json()
-    crew_name = []
-    final_cast = []
-    k = 0
-    if 'cast' in data:
-        for i in data["cast"]:
-            if k != 6 and i['profile_path'] is not None:
-                crew_name.append(i['name'])
-                final_cast.append("https://image.tmdb.org/t/p/w500/" + i['profile_path'])
-                k += 1
-            else:
-                break
-    return crew_name, final_cast
-
-
-
-def date(movie_id):
-    response = requests.get(
-        "https://api.themoviedb.org/3/movie/{0}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
-            movie_id))
-    data = response.json()
-    if 'release_date' in data:
-        return data['release_date']
-    else:
-        return "Release date not available"
-
-
-def genres(movie_id):
-    response = requests.get(
-        "https://api.themoviedb.org/3/movie/{0}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
-            movie_id))
-    data = response.json()
-    if 'genres' in data:
-        return data['genres']
-    else:
-        return []
-
-def overview(movie_id):
-    response = requests.get(
-        "https://api.themoviedb.org/3/movie/{0}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
-            movie_id))
-    data = response.json()
-    if 'overview' in data:
-        return data['overview']
-    else:
-        return "Overview not available"
-
-
 def poster(movie_id):
-    response = requests.get("https://api.themoviedb.org/3/movie/{}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(movie_id))
-    data = response.json()
-    if 'poster_path' in data:
-        return "https://image.tmdb.org/t/p/w500/" + data['poster_path']
-    else:
+    """Get movie poster with proper error handling"""
+    try:
+        response = requests.get(
+            f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US")
+        data = response.json()
+        if response.status_code == 200 and data.get('poster_path'):
+            return "https://image.tmdb.org/t/p/w500" + data['poster_path']
+        return ""
+    except:
         return ""
 
 
+@st.cache_data
+def overview(movie_id):
+    """Get movie overview with proper error handling"""
+    try:
+        response = requests.get(
+            f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US")
+        data = response.json()
+        if response.status_code == 200 and data.get('overview'):
+            return data['overview']
+        return "Overview not available"
+    except:
+        return "Overview not available"
+
+
+@st.cache_data
+def date(movie_id):
+    """Get release date with proper error handling"""
+    try:
+        response = requests.get(
+            f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US")
+        data = response.json()
+        if response.status_code == 200 and data.get('release_date'):
+            return data['release_date']
+        return "Release date not available"
+    except:
+        return "Release date not available"
+
+
+@st.cache_data
+def genres(movie_id):
+    """Get genres with proper error handling"""
+    try:
+        response = requests.get(
+            f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US")
+        data = response.json()
+        if response.status_code == 200 and data.get('genres'):
+            return data['genres']
+        return []
+    except:
+        return []
+
+
+@st.cache_data
 def rating(movie_id):
-    response = requests.get(
-        "https://api.themoviedb.org/3/movie/{0}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
-            movie_id))
-    data = response.json()
-    if 'vote_average' in data:
-        return data['vote_average']
-    else:
-        return "Rating not available"
+    """Get rating with proper error handling"""
+    try:
+        response = requests.get(
+            f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US")
+        data = response.json()
+        if response.status_code == 200 and data.get('vote_average') is not None:
+            return float(data['vote_average'])
+        return 0.0
+    except:
+        return 0.0
+
+
+@st.cache_data
+def trailer(movie_id):
+    """Get trailer with proper error handling"""
+    try:
+        response = requests.get(
+            f"https://api.themoviedb.org/3/movie/{movie_id}/videos?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US")
+        data = response.json()
+        if response.status_code == 200 and data.get('results') and len(data['results']) > 0:
+            return data['results'][0]['key']
+        return ""
+    except:
+        return ""
+
+
+@st.cache_data
+def crew(movie_id):
+    """Get crew with proper error handling"""
+    try:
+        response = requests.get(
+            f"https://api.themoviedb.org/3/movie/{movie_id}/credits?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US")
+        data = response.json()
+        crew_name = []
+        final_cast = []
+
+        if response.status_code == 200 and data.get('cast'):
+            k = 0
+            for i in data["cast"]:
+                if k != 6 and i.get('profile_path'):
+                    crew_name.append(i.get('name', 'Unknown'))
+                    final_cast.append("https://image.tmdb.org/t/p/w500" + i['profile_path'])
+                    k += 1
+                if k >= 6:
+                    break
+
+        return crew_name, final_cast
+    except:
+        return [], []
+
+
+def get_movie_info(movie_id):
+    """Get all movie information with proper error handling"""
+    try:
+        # Make a single API call to get most of the data
+        response = requests.get(
+            f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US")
+        if response.status_code != 200:
+            return None
+
+        data = response.json()
+
+        # Get crew info separately
+        crew_names, crew_images = crew(movie_id)
+        trailer_key = trailer(movie_id)
+
+        return {
+            'movie_id': movie_id,
+            'genres': data.get('genres', []),
+            'rating': float(data.get('vote_average', 0)),
+            'poster': "https://image.tmdb.org/t/p/w500" + data['poster_path'] if data.get('poster_path') else "",
+            'overview': data.get('overview', "No overview available"),
+            'release_date': data.get('release_date', "Release date not available"),
+            'trailer': trailer_key,
+            'crew_names': crew_names,
+            'crew_images': crew_images
+        }
+    except Exception as e:
+        print(f"Error getting movie info for {movie_id}: {str(e)}")
+        return None
 
 
 
@@ -165,17 +247,6 @@ def get_reviews(movie_id):
 
 
 
-def trailer(movie_id):
-    response = requests.get(
-        "https://api.themoviedb.org/3/movie/{0}/videos?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US".format(
-            movie_id))
-    data = response.json()
-    if 'results' in data and data['results']:
-        return data['results'][0]['key']
-    else:
-        return "Trailer not available"
-
-
 
 def get_watch_providers(movie_id):
     """Get streaming/watch providers for the movie"""
@@ -191,197 +262,85 @@ def get_watch_providers(movie_id):
     }
 
 
-class MovieRecommenderBot:
-    def __init__(self, movies_df, similarity):
-        self.movies_df = movies_df
-        self.similarity = similarity
-        self.mood_keywords = {
-            'happy': ['comedy', 'animation', 'family', 'musical'],
-            'sad': ['drama', 'romance', 'indie'],
-            'excited': ['action', 'adventure', 'sci-fi', 'thriller'],
-            'scared': ['horror', 'thriller', 'mystery'],
-            'relaxed': ['documentary', 'comedy', 'family'],
-            'thoughtful': ['drama', 'documentary', 'history', 'mystery']
-        }
-
-        self.holiday_recommendations = {
-            'christmas': ['holiday', 'family', 'comedy', 'romance'],
-            'halloween': ['horror', 'thriller', 'mystery'],
-            'valentine': ['romance', 'comedy', 'drama'],
-            'thanksgiving': ['family', 'comedy', 'drama'],
-            'summer': ['action', 'adventure', 'comedy']
-        }
-
-    def get_movie_info(self, movie_id):
-        """Get combined movie information using your existing functions"""
-        return {
-            'genres': genres(movie_id),
-            'rating': rating(movie_id),
-            'release_date': date(movie_id)
-        }
-
-    def recommend_by_mood(self, mood):
-        """Recommend movies based on user's mood"""
-        preferred_genres = self.mood_keywords.get(mood.lower(), [])
-        recommended_movies = []
-
-        for _, movie in self.movies_df.iterrows():
-            movie_info = self.get_movie_info(movie.movie_id)
-            movie_genres = [genre['name'].lower() for genre in movie_info['genres']]
-
-            if any(genre in preferred_genres for genre in movie_genres):
-                if movie_info['rating'] > 7.0:  # Only recommend highly-rated movies
-                    recommended_movies.append({
-                        'title': movie.title,
-                        'rating': movie_info['rating'],
-                        'genres': movie_genres,
-                        'poster': poster(movie.movie_id)
-                    })
-
-        return sorted(recommended_movies, key=lambda x: x['rating'], reverse=True)[:5]
-
-    def recommend_movie_combination(self, movie1, movie2):
-        """Recommend movies based on two movies the user likes"""
-        try:
-            idx1 = self.movies_df[self.movies_df['title'] == movie1].index[0]
-            idx2 = self.movies_df[self.movies_df['title'] == movie2].index[0]
-
-            combined_similarity = (self.similarity[idx1] + self.similarity[idx2]) / 2
-            movie_indices = combined_similarity.argsort()[::-1][1:6]
-
-            recommendations = []
-            for idx in movie_indices:
-                movie = self.movies_df.iloc[idx]
-                movie_info = self.get_movie_info(movie.movie_id)
-                recommendations.append({
-                    'title': movie.title,
-                    'rating': movie_info['rating'],
-                    'genres': [genre['name'] for genre in movie_info['genres']],
-                    'poster': poster(movie.movie_id)
-                })
-
-            return recommendations
-        except IndexError:
-            return []
-
-    def recommend_marathon(self, theme):
-        """Recommend movie marathon based on theme"""
-        if theme.lower() in self.holiday_recommendations:
-            preferred_genres = self.holiday_recommendations[theme.lower()]
-            marathon_movies = []
-
-            for _, movie in self.movies_df.iterrows():
-                movie_info = self.get_movie_info(movie.movie_id)
-                movie_genres = [genre['name'].lower() for genre in movie_info['genres']]
-
-                if any(genre in preferred_genres for genre in movie_genres):
-                    if movie_info['rating'] > 7.5:
-                        marathon_movies.append({
-                            'title': movie.title,
-                            'rating': movie_info['rating'],
-                            'genres': movie_genres,
-                            'poster': poster(movie.movie_id)
-                        })
-
-            return sorted(marathon_movies, key=lambda x: x['rating'], reverse=True)[:5]
-        return []
-
-    def process_user_input(self, user_input):
-        """Process user input and determine intent"""
-        user_input = user_input.lower()
-
-        # Check for mood-based recommendation request
-        for mood in self.mood_keywords.keys():
-            if mood in user_input or f"feeling {mood}" in user_input:
-                return {
-                    'intent': 'mood',
-                    'value': mood,
-                    'recommendations': self.recommend_by_mood(mood)
-                }
-
-        # Check for movie combination request
-        movie_combo_pattern = r"if i like (.*) and (.*)"
-        combo_match = re.search(movie_combo_pattern, user_input)
-        if combo_match:
-            movie1, movie2 = combo_match.groups()
-            return {
-                'intent': 'combination',
-                'movies': (movie1.strip(), movie2.strip()),
-                'recommendations': self.recommend_movie_combination(movie1.strip(), movie2.strip())
-            }
-
-        # Check for marathon request
-        for holiday in self.holiday_recommendations.keys():
-            if holiday in user_input or f"{holiday} marathon" in user_input:
-                return {
-                    'intent': 'marathon',
-                    'theme': holiday,
-                    'recommendations': self.recommend_marathon(holiday)
-                }
-
-        return {'intent': 'unknown'}
+# Watchlist functions
+def load_watchlist():
+    if os.path.exists('watchlist.txt'):
+        with open('watchlist.txt', 'r') as f:
+            return [line.strip() for line in f.readlines()]
+    return []
 
 
+def save_watchlist(watchlist):
+    with open('watchlist.txt', 'w') as f:
+        f.write('\n'.join(watchlist))
+
+
+def add_to_watchlist(movie_title):
+    watchlist = load_watchlist()
+    if movie_title not in watchlist:
+        watchlist.append(movie_title)
+        save_watchlist(watchlist)
+        return True
+    return False
+
+
+def remove_from_watchlist(movie_title):
+    watchlist = load_watchlist()
+    if movie_title in watchlist:
+        watchlist.remove(movie_title)
+        save_watchlist(watchlist)
+        return True
+    return False
+
+
+def display_watchlist():
+    st.sidebar.title("My Watchlist")
+    watchlist = load_watchlist()
+
+    if watchlist:
+        for movie in watchlist:
+            col1, col2 = st.sidebar.columns([3, 1])
+            with col1:
+                st.write(movie)
+            with col2:
+                if st.button("🗑️", key=f"remove_{movie}"):
+                    remove_from_watchlist(movie)
+                    st.rerun()
+    else:
+        st.sidebar.write("Your watchlist is empty")
+
+
+# Base similarity recommendation function
 def recommend(movie):
     try:
-        # Get the index of the selected movie
         movie_index = movies[movies['title'] == movie].index[0]
-
-        # Get cosine similarity scores of the selected movie with all other movies
         cosine_angles = similarity[movie_index]
-
-        # Get the 7 movies with highest similarity scores
         recommended_movies = sorted(list(enumerate(cosine_angles)), reverse=True, key=lambda x: x[1])[0:7]
 
-        # Initialize lists to store recommended movies' details
         final = []
         final_posters = []
 
-        # Get the crew details (director, cast) of the selected movie
-        final_name , final_cast = crew(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-
-        # Get the genres of the selected movie
+        final_name, final_cast = crew(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
         gen = genres(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-
-        # Get the overview of the selected movie
         overview_final = overview(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-
-        # Get the release date of the selected movie
         rel_date = date(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-
-        # Get the ratings of the selected movie
         ratings = rating(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-
-        # Get the reviews of the selected movie
         re4view = get_reviews(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-
-        # Get the average rating of the selected movie
         rev = rating(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
-
-        # Get the trailer link of the selected movie
         trailer_final = trailer(movies.iloc[movies[movies['title'] == movie].index[0]].movie_id)
 
-        # Loop through recommended movies to store their details
         for i in recommended_movies:
-            # Store recommended movie title, rating, and score
             title = movies.iloc[i[0]].title
-            ratingg = rating(movies.iloc[i[0]].movie_id)
-            score = round(i[1], 2)
-            final.append(f"{title} (Rating: {ratingg}) - Similarity score: {score}")
+            if title not in st.session_state.skipped_movies:  # Skip movies user isn't interested in
+                ratingg = rating(movies.iloc[i[0]].movie_id)
+                score = round(i[1], 2)
+                final.append(f"{title} (Rating: {ratingg}) - Similarity score: {score}")
+                final_posters.append(poster(movies.iloc[i[0]].movie_id))
 
+        return final_name, final_cast, rel_date, gen, overview_final, final, final_posters, ratings, re4view, rev, trailer_final
 
-            # Store recommended movie poster
-            final_posters.append(poster(movies.iloc[i[0]].movie_id))
-
-
-
-        # Return all details
-        return final_name , final_cast , rel_date , gen , overview_final , final , final_posters, ratings, re4view, rev, trailer_final
-
-    # Catch index error when selected movie not found in dataset
     except IndexError:
         return None
-
 
 
 
@@ -554,69 +513,70 @@ if st.button('Search'):
 
 import os
 
-# Create a file to store the watchlist
-WATCHLIST_FILE = 'watchlist.txt'
-if not os.path.exists(WATCHLIST_FILE):
-    open(WATCHLIST_FILE, 'w').close()
+# # Create a file to store the watchlist
+# WATCHLIST_FILE = 'watchlist.txt'
+# if not os.path.exists(WATCHLIST_FILE):
+#     open(WATCHLIST_FILE, 'w').close()
+#
+# # Load the watchlist from the file
+# with open(WATCHLIST_FILE, 'r') as f:
+#     watchlist = f.read().splitlines()
+#
+# # Create a form to add a movie to the watchlist
+# # Modify the form version to have a distinct key
+# with st.form(key='manual_watchlist_form'):  # Changed the form key
+#     movie_title = st.text_input(label='Add to Watchlist Manually', value=selected_movie)
+#     add_movie = st.form_submit_button(label='Add to Watchlist manually')  # Changed the button label
+#
+# # If the add movie button is clicked and the movie title is not empty, add the movie to the watchlist
+# if add_movie and movie_title:
+#     if movie_title not in watchlist:
+#         watchlist.append(movie_title)
+#         with open(WATCHLIST_FILE, 'w') as f:
+#             f.write('\n'.join(watchlist))
+#         st.success(f'{movie_title} added to Watchlist!')
+#     else:
+#         st.warning(f'{movie_title} is already in the Watchlist!')
+#
+# # If the add movie button is clicked and the movie title is empty, show an error message
+# if add_movie and not movie_title:
+#     st.error('Please enter a movie title.')
+#
+# # Create a form to remove a movie from the watchlist
+# with st.form(key='remove_movie_form'):
+#     # Display the watchlist as a selectbox
+#     selected_movie = st.selectbox('Select a movie to remove from Watchlist', watchlist)
+#     remove_movie = st.form_submit_button(label='Remove Movie')
+#
+# # If the remove movie button is clicked, remove the selected movie from the watchlist
+#
+# if remove_movie and selected_movie:
+#     watchlist.remove(selected_movie)
+#     with open(WATCHLIST_FILE, 'w') as f:
+#         f.write('\n'.join(watchlist))
+#     st.success(f'{selected_movie} removed from Watchlist!')
 
-# Load the watchlist from the file
-with open(WATCHLIST_FILE, 'r') as f:
-    watchlist = f.read().splitlines()
 
-# Create a form to add a movie to the watchlist
-with st.form(key='add_movie_form'):
-    movie_title = st.text_input(label='WATCHLIST', value=selected_movie)
-    add_movie = st.form_submit_button(label='Add Movie')
-
-# If the add movie button is clicked and the movie title is not empty, add the movie to the watchlist
-if add_movie and movie_title:
-    if movie_title not in watchlist:
-        watchlist.append(movie_title)
-        with open(WATCHLIST_FILE, 'w') as f:
-            f.write('\n'.join(watchlist))
-        st.success(f'{movie_title} added to Watchlist!')
-    else:
-        st.warning(f'{movie_title} is already in the Watchlist!')
-
-# If the add movie button is clicked and the movie title is empty, show an error message
-if add_movie and not movie_title:
-    st.error('Please enter a movie title.')
-
-# Create a form to remove a movie from the watchlist
-with st.form(key='remove_movie_form'):
-    # Display the watchlist as a selectbox
-    selected_movie = st.selectbox('Select a movie to remove from Watchlist', watchlist)
-    remove_movie = st.form_submit_button(label='Remove Movie')
-
-# If the remove movie button is clicked, remove the selected movie from the watchlist
-
-if remove_movie and selected_movie:
-    watchlist.remove(selected_movie)
-    with open(WATCHLIST_FILE, 'w') as f:
-        f.write('\n'.join(watchlist))
-    st.success(f'{selected_movie} removed from Watchlist!')
-
-
-# Display the watchlist with movie details
-if watchlist:
-    movie_data = []
-    for movie in watchlist:
-        # Make a request to the TMDb API to get movie details
-        response = requests.get(
-            "https://api.themoviedb.org/3/search/movie?api_key=4158f8d4403c843543d3dc953f225d77&query={}".format(
-                movie))
-        if response.status_code == 200:
-            results = response.json()['results']
-            if len(results) > 0:
-                data = results[0]
-                movie_data.append(data)
-    if movie_data:
-        df = pd.DataFrame(movie_data, columns=['title', 'overview'])
-        st.write(df)
-    else:
-        st.write('No movie details found.')
-else:
-    st.write('Watchlist is empty.')
+# # Display the watchlist with movie details
+# if watchlist:
+#     movie_data = []
+#     for movie in watchlist:
+#         # Make a request to the TMDb API to get movie details
+#         response = requests.get(
+#             "https://api.themoviedb.org/3/search/movie?api_key=4158f8d4403c843543d3dc953f225d77&query={}".format(
+#                 movie))
+#         if response.status_code == 200:
+#             results = response.json()['results']
+#             if len(results) > 0:
+#                 data = results[0]
+#                 movie_data.append(data)
+#     if movie_data:
+#         df = pd.DataFrame(movie_data, columns=['title', 'overview'])
+#         st.write(df)
+#     else:
+#         st.write('No movie details found.')
+# else:
+#     st.write('Watchlist is empty.')
 
 
 
@@ -653,11 +613,36 @@ add_social_buttons(selected_movie)
 st.markdown("---")
 
 
+def add_to_watchlist(movie_title, watchlist_file='watchlist.txt'):  # Changed from watchlist1.txt to watchlist.txt
+    """Add a movie to the watchlist with proper feedback"""
+    try:
+        # Create file if it doesn't exist
+        if not os.path.exists(watchlist_file):
+            with open(watchlist_file, 'w') as f:
+                f.write('')
+
+        # Read existing watchlist
+        with open(watchlist_file, 'r') as f:
+            watchlist = [line.strip() for line in f.readlines()]
+
+        # Add movie if not already in watchlist
+        if movie_title not in watchlist:
+            watchlist.append(movie_title)
+            with open(watchlist_file, 'w') as f:
+                f.write('\n'.join(watchlist))
+            return True
+        return False
+    except Exception as e:
+        print(f"Error adding to watchlist: {str(e)}")
+        return False
 
 class ComprehensiveMovieBot:
     def __init__(self, movies_df, similarity):
         self.movies_df = movies_df
         self.similarity = similarity
+        self.recommendation_cache = {}
+        self.movie_info_cache = {}
+
 
         # Seasonal/Holiday mappings
         self.seasonal_mappings = {
@@ -684,6 +669,39 @@ class ComprehensiveMovieBot:
             }
         }
 
+        self.genre_mappings = {
+            'action': {
+                'required_genres': ['Action'],
+                'preferred_genres': ['Adventure', 'Thriller', 'Science Fiction'],
+                'min_rating': 6.5
+            },
+            'comedy': {
+                'required_genres': ['Comedy'],
+                'preferred_genres': ['Romance', 'Family'],
+                'min_rating': 6.5
+            },
+            'drama': {
+                'required_genres': ['Drama'],
+                'preferred_genres': ['Romance', 'History'],
+                'min_rating': 7.0
+            },
+            'horror': {
+                'required_genres': ['Horror'],
+                'preferred_genres': ['Thriller', 'Mystery'],
+                'min_rating': 6.5
+            },
+            'romance': {
+                'required_genres': ['Romance'],
+                'preferred_genres': ['Drama', 'Comedy'],
+                'min_rating': 6.5
+            },
+            'family': {
+                'required_genres': ['Family'],
+                'preferred_genres': ['Animation', 'Adventure', 'Comedy'],
+                'min_rating': 7.0
+            }
+        }
+
         # Special categories
         self.special_categories = {
             'family night': {
@@ -703,29 +721,86 @@ class ComprehensiveMovieBot:
 
         # Mood mappings
         self.mood_mappings = {
-            'happy': ['Comedy', 'Animation', 'Family', 'Musical'],
-            'sad': ['Drama', 'Romance'],
-            'excited': ['Action', 'Adventure', 'Science Fiction', 'Thriller'],
-            'relaxed': ['Documentary', 'Family', 'Comedy'],
-            'romantic': ['Romance', 'Drama', 'Comedy'],
-            'thoughtful': ['Drama', 'Documentary', 'History']
+            'happy': {
+                'required_genres': ['Comedy', 'Animation', 'Family'],
+                'preferred_genres': ['Adventure', 'Fantasy', 'Musical'],
+                'exclude_genres': ['Horror', 'War', 'Thriller'],
+                'min_rating': 7.0
+            },
+            'sad': {
+                'required_genres': ['Drama'],
+                'preferred_genres': ['Romance', 'War', 'History'],
+                'exclude_genres': ['Comedy', 'Horror', 'Action'],
+                'min_rating': 7.5
+            },
+            'excited': {
+                'required_genres': ['Action', 'Adventure'],
+                'preferred_genres': ['Science Fiction', 'Fantasy', 'Thriller'],
+                'exclude_genres': ['Documentary', 'Drama'],
+                'min_rating': 7.0
+            },
+            'relaxed': {
+                'required_genres': ['Documentary', 'Family'],
+                'preferred_genres': ['Comedy', 'Animation', 'Nature'],
+                'exclude_genres': ['Horror', 'Thriller', 'War'],
+                'min_rating': 7.0
+            },
+            'romantic': {
+                'required_genres': ['Romance'],
+                'preferred_genres': ['Drama', 'Comedy'],
+                'exclude_genres': ['Horror', 'War', 'Thriller'],
+                'min_rating': 7.0
+            }
         }
 
     def get_movie_info(self, movie_id):
-        """Get movie information with caching"""
+        """Get movie information with caching to reduce repetitive fetches."""
+        if movie_id in self.movie_info_cache:
+            return self.movie_info_cache[movie_id]  # Use cached data
+
         try:
-            return {
-                'movie_id': movie_id,  # Add movie_id to the info dict
-                'genres': genres(movie_id),
-                'rating': rating(movie_id),
-                'poster': poster(movie_id),
-                'overview': overview(movie_id),
-                'release_date': date(movie_id),
-                'trailer': trailer(movie_id)
+            # Fetch movie information and store in cache
+            movie_info = {
+                'movie_id': movie_id,
+                'genres': genres(movie_id) or [],
+                'rating': rating(movie_id) or 0.0,
+                'poster': poster(movie_id) or "",
+                'overview': overview(movie_id) or "No overview available",
+                'release_date': date(movie_id) or "Release date not available",
+                'trailer': trailer(movie_id) or ""
             }
+            self.movie_info_cache[movie_id] = movie_info  # Cache the result
+            return movie_info
+
         except Exception as e:
             print(f"Error getting movie info for {movie_id}: {str(e)}")
             return None
+
+    def get_fresh_recommendations(self, category_type, category=None, input_movie=None):
+        """Get fresh recommendations based on category type"""
+        if category_type == 'similarity' and input_movie:
+            return recommend(input_movie)
+        elif category_type == 'mood':
+            return self.get_recommendations(category.lower())
+        elif category_type == 'seasonal':
+            return self.get_seasonal_recommendations(category.lower())
+        else:  # Quick categories
+            return self.get_recommendations(category.lower())
+
+
+    def get_recommendations_with_offset(self, category_type, category=None, offset=0):
+        """Get recommendations with offset for refresh functionality"""
+        if 'recommendation_offset' not in st.session_state:
+            st.session_state.recommendation_offset = offset
+
+        recommendations = self.get_recommendations(category)
+        if recommendations and 'recommendations' in recommendations:
+            # Rotate recommendations based on offset
+            recs = recommendations['recommendations']
+            rotated_recs = recs[offset:] + recs[:offset]
+            recommendations['recommendations'] = rotated_recs
+
+        return recommendations
 
     def detect_category(self, text):
         """Detect category from user input"""
@@ -804,59 +879,328 @@ class ComprehensiveMovieBot:
 
         return None
 
+    def matches_mood_criteria(self, movie_info, criteria):
+        """Check if movie matches mood criteria"""
+        try:
+            if not movie_info or 'genres' not in movie_info:
+                return False
+
+            movie_genres = [g['name'] for g in movie_info['genres']]
+
+            # Must have at least one required genre
+            if not any(genre in movie_genres for genre in criteria['required_genres']):
+                return False
+
+            # Must not have any excluded genres
+            if any(genre in movie_genres for genre in criteria.get('exclude_genres', [])):
+                return False
+
+            # Check rating
+            rating = movie_info.get('rating')
+            if isinstance(rating, str):
+                try:
+                    rating = float(rating)
+                except ValueError:
+                    return False
+
+            if not rating or rating < criteria.get('min_rating', 7.0):
+                return False
+
+            return True
+
+        except Exception as e:
+            print(f"Error in matches_mood_criteria: {str(e)}")
+            return False
+
+    def matches_genre_criteria(self, movie_info, criteria):
+        """Check if movie matches genre criteria"""
+        try:
+            if not movie_info or 'genres' not in movie_info:
+                return False
+
+            movie_genres = [g['name'] for g in movie_info['genres']]
+
+            # Check if movie has required genre
+            if not any(genre in movie_genres for genre in criteria['required_genres']):
+                return False
+
+            # Check rating
+            rating = movie_info.get('rating')
+            if isinstance(rating, str):
+                try:
+                    rating = float(rating)
+                except ValueError:
+                    return False
+
+            if not rating or rating < criteria['min_rating']:
+                return False
+
+            return True
+
+        except Exception as e:
+            print(f"Error in matches_genre_criteria: {str(e)}")
+            return False
+
+    @st.cache_data
+    def get_all_recommendations(self, category_type, category):
+        """Get all possible recommendations for a category and cache them, with pre-filtering."""
+        recommendations = []
+
+        if category_type == 'mood':
+            criteria = self.mood_mappings.get(category, {})
+        else:
+            criteria = self.genre_mappings.get(category, {})
+
+        # Use pre-filtered DataFrame
+        filtered_movies_df = self.filter_movies_by_criteria(
+            required_genres=criteria.get('required_genres'),
+            exclude_genres=criteria.get('exclude_genres'),
+            min_rating=criteria.get('min_rating', 0)[0] if isinstance(criteria.get('min_rating', 0),
+                                                                      list) else criteria.get('min_rating', 0)
+        )
+
+        # Now process only the filtered movies
+        for _, movie in filtered_movies_df.iterrows():
+            movie_info = self.get_movie_info(movie.movie_id)
+            if movie_info and self.matches_genre_criteria(movie_info, criteria):
+                recommendations.append({
+                    'title': movie.title,
+                    'info': movie_info
+                })
+
+        recommendations = sorted(
+            recommendations,
+            key=lambda x: float(x['info']['rating']) if isinstance(x['info']['rating'], (int, float)) else 0,
+            reverse=True
+        )
+
+        return recommendations
+
+    def get_seasonal_recommendations(self, season, page=0, page_size=5):
+        """Get recommendations for seasonal movies with pagination."""
+        try:
+            if season.lower() not in self.seasonal_mappings:
+                return None
+
+            # Retrieve season-specific criteria
+            season_data = self.seasonal_mappings[season.lower()]
+            required_genres = season_data['genres']
+            exclude_genres = season_data.get('exclude_genres', [])
+            min_rating = 7.0  # Adjust as needed
+
+            # Use the filter to limit the number of movies processed
+            filtered_movies_df = self.filter_movies_by_criteria(
+                required_genres=required_genres,
+                exclude_genres=exclude_genres,
+                min_rating=min_rating
+            )
+
+            # Process only filtered movies for recommendations
+            recommendations = []
+            for _, movie in filtered_movies_df.iterrows():
+                movie_info = self.get_movie_info(movie.movie_id)
+                if not movie_info:
+                    continue
+
+                if self.check_seasonal_criteria(movie_info, season):
+                    recommendations.append({
+                        'title': movie.title,
+                        'info': movie_info
+                    })
+
+            recommendations = sorted(
+                recommendations,
+                key=lambda x: float(x['info']['rating']) if isinstance(x['info']['rating'], (int, float)) else 0,
+                reverse=True
+            )
+
+            # Paginate
+            start_idx = page * page_size
+            end_idx = start_idx + page_size
+            page_recommendations = recommendations[start_idx:end_idx]
+
+            return {
+                'type': 'seasonal',
+                'category': season.lower(),
+                'recommendations': page_recommendations,
+                'has_more': end_idx < len(recommendations),
+                'total_pages': (len(recommendations) + page_size - 1) // page_size,
+                'current_page': page
+            }
+
+        except Exception as e:
+            print(f"Error in get_seasonal_recommendations: {str(e)}")
+            return None
+
+    def filter_movies_by_criteria(self, required_genres=None, exclude_genres=None, min_rating=0):
+        """Filters movies based on genres and minimum rating."""
+        filtered_df = self.movies_df
+
+        if required_genres:
+            filtered_df = filtered_df[filtered_df['genres'].apply(
+                lambda genres: any(genre in genres for genre in required_genres)
+            )]
+
+        if exclude_genres:
+            filtered_df = filtered_df[~filtered_df['genres'].apply(
+                lambda genres: any(genre in genres for genre in exclude_genres)
+            )]
+
+        if min_rating > 0:
+            filtered_df = filtered_df[filtered_df['rating'] >= min_rating]
+
+        return filtered_df
+
     def get_recommendations(self, user_input):
         """Get movie recommendations based on user input"""
         try:
+            # Get the current offset from session state
+            offset = st.session_state.get('recommendation_offset', 0)
             user_input = user_input.lower().strip()
             print(f"Processing input: {user_input}")
 
-            # Detect category
-            category = self.detect_category(user_input)
-            print(f"Detected category: {category}")
+            # Add a random offset to get different movies each time
+            if 'recommendation_offset' not in st.session_state:
+                st.session_state.recommendation_offset = 0
 
-            if not category:
+            # First check if it's a seasonal request
+            seasonal_terms = {
+                'christmas movies': 'christmas',
+                'halloween movies': 'halloween',
+                "valentine's day movies": 'valentine',
+                'summer blockbusters': 'summer',
+                'holiday movies': 'christmas',
+                'family movie night': 'family',
+                'date night movies': 'date'
+            }
+
+            # Check for seasonal match
+            for term, season in seasonal_terms.items():
+                if term in user_input:
+                    result = self.get_seasonal_recommendations(season)
+                    if result:
+                        # Rotate recommendations based on offset
+                        rotated_recs = result['recommendations'][st.session_state.recommendation_offset:] + \
+                                       result['recommendations'][:st.session_state.recommendation_offset]
+                        result['recommendations'] = rotated_recs
+                    return result
+
+            # Check if it's a mood
+            mood = None
+            for mood_key in self.mood_mappings.keys():
+                if mood_key in user_input:
+                    mood = mood_key
+                    break
+
+            # Check if it's a genre
+            genre = None
+            if not mood:  # Only check genre if no mood was found
+                for key in self.genre_mappings.keys():
+                    if key in user_input:
+                        genre = key
+                        break
+
+            if not mood and not genre:
+                # Check for special categories
+                for category in self.special_categories.keys():
+                    if category in user_input:
+                        criteria = self.special_categories[category]
+                        recommendations = []
+
+                        # Use offset for movie selection
+                        start_idx = st.session_state.recommendation_offset
+                        for _, movie in self.movies_df.iloc[start_idx:].iterrows():
+                            try:
+                                movie_info = self.get_movie_info(movie.movie_id)
+                                if not movie_info:
+                                    continue
+
+                                if self.check_special_criteria(movie_info, category):
+                                    recommendations.append({
+                                        'title': movie.title,
+                                        'info': movie_info
+                                    })
+
+                                if len(recommendations) >= 10:
+                                    break
+
+                            except Exception as e:
+                                print(f"Error processing movie {movie.title}: {str(e)}")
+                                continue
+
+                        recommendations = sorted(
+                            recommendations,
+                            key=lambda x: float(x['info']['rating']) if isinstance(x['info']['rating'],
+                                                                                   (int, float)) else 0,
+                            reverse=True
+                        )[:5]
+
+                        return {
+                            'type': 'special',
+                            'category': category,
+                            'recommendations': recommendations
+                        }
+
                 return {'type': 'unknown', 'category': None, 'recommendations': []}
 
-            # Process movies based on category
+            # Get recommendations based on type
             recommendations = []
 
-            # Get initial candidates
-            candidates = self.movies_df.head(1000)  # Limit initial search to 1000 movies
+            if mood:
+                print(f"Found mood: {mood}")
+                criteria = self.mood_mappings[mood]
+                matcher = self.matches_mood_criteria
+                rec_type = 'mood'
+                category = mood
+            else:
+                print(f"Found genre: {genre}")
+                criteria = self.genre_mappings[genre]
+                matcher = self.matches_genre_criteria
+                rec_type = 'genre'
+                category = genre
 
-            for _, movie in candidates.iterrows():
+            # Process movies with offset
+            start_idx = st.session_state.recommendation_offset
+            for _, movie in self.movies_df.iloc[start_idx:].iterrows():
                 try:
-                    # Get movie info
                     movie_info = self.get_movie_info(movie.movie_id)
                     if not movie_info:
                         continue
 
-                    # Check if movie matches category criteria
-                    if self.check_recommendation_criteria(movie_info, category):
+                    if matcher(movie_info, criteria):
                         recommendations.append({
                             'title': movie.title,
                             'info': movie_info
                         })
 
-                    # Break if we have enough recommendations
-                    if len(recommendations) >= 5:
+                    if len(recommendations) >= 10:
                         break
 
                 except Exception as e:
                     print(f"Error processing movie {movie.title}: {str(e)}")
                     continue
 
-            # Sort recommendations by rating
-            recommendations = sorted(
-                recommendations,
-                key=lambda x: float(x['info']['rating']) if isinstance(x['info']['rating'], (int, float))
-                else 0,
-                reverse=True
-            )
+            # If we don't have enough recommendations, reset offset and try again from start
+            if len(recommendations) < 5:
+                st.session_state.recommendation_offset = 0
+                return self.get_recommendations(user_input)
+
+            # # Sort by rating and take top 5
+            # recommendations = sorted(
+            #     recommendations,
+            #     key=lambda x: float(x['info']['rating']) if isinstance(x['info']['rating'], (int, float)) else 0,
+            #     reverse=True
+            # )[:5]
+
+            # Increment offset for next refresh
+            st.session_state.recommendation_offset += 5
+            if st.session_state.recommendation_offset >= len(self.movies_df):
+                st.session_state.recommendation_offset = 0
 
             return {
-                'type': category['type'],
-                'category': category['category'],
-                'recommendations': recommendations[:5]
+                'type': rec_type,
+                'category': category,
+                'recommendations': recommendations
             }
 
         except Exception as e:
@@ -1001,44 +1345,6 @@ class ComprehensiveMovieBot:
             print(f"Error in check_genre_criteria: {str(e)}")
             return False
 
-
-def display_recommendations(result):
-    """Display movie recommendations"""
-    try:
-        if result['type'] == 'error':
-            st.error("An error occurred while getting recommendations. Please try again.")
-            return
-
-        if not result.get('recommendations'):
-            st.warning(f"No recommendations found for {result.get('category', 'your request')}. Try another category!")
-            return
-
-        st.subheader(f"Here are your {result.get('category', '')} recommendations:")
-
-        cols = st.columns(min(len(result['recommendations']), 5))
-        for col, rec in zip(cols, result['recommendations']):
-            with col:
-                if rec['info'].get('poster'):
-                    st.image(rec['info']['poster'], width=150)
-                st.write(f"**{rec['title']}**")
-
-                rating = rec['info'].get('rating')
-                if rating:
-                    st.write(f"Rating: {rating}")
-
-                with st.expander("More Info"):
-                    st.write("**Overview:**")
-                    st.write(rec['info'].get('overview', 'No overview available'))
-
-                    genres = rec['info'].get('genres', [])
-                    if genres:
-                        st.write("**Genres:**")
-                        st.write(", ".join([g['name'] for g in genres]))
-
-    except Exception as e:
-        st.error(f"Error displaying recommendations: {str(e)}")
-
-
 # Load data and initialize bot
 movies_dict = pickle.load(open('movies_dict.pkl', 'rb'))
 movies = pd.DataFrame(movies_dict)
@@ -1064,63 +1370,228 @@ mood_options = [
     "Romantic", "Thoughtful"
 ]
 
-# Create Streamlit interface
-st.title("Smart Movie Recommendation System")
 
+def display_movie_details(movie_data):
+    """Display main movie details"""
+    name, cast, rel_date, gen, overview_final, ans, posters, ratings, re4view, rev, trailer_final = movie_data[:11]
+
+    st.header(selected_movie)
+    col_1, col_2 = st.columns(2)
+    with col_1:
+        if posters:
+            st.image(posters[0], width=325, use_column_width=325)
+        else:
+            st.write("Poster not available")
+
+    with col_2:
+        st.write("Title : {} ".format(ans[0]))
+        st.write("Overview : {} ".format(overview_final))
+        genres = process(gen)
+        genres_str = " , ".join(genres)
+        st.write("Genres : {}".format(genres_str))
+        st.write("Release Date : {} ".format(rel_date))
+        st.write("Ratings : {} ".format(ratings))
+
+    return name, cast, ans, posters, re4view
+
+
+def display_recommendations(recommendations, category_type=None):
+    """Display recommendations with working buttons"""
+    if not recommendations:
+        st.warning("No recommendations found!")
+        return
+
+    # Refresh button
+    cols = st.columns([1, 2, 1])
+    with cols[1]:
+        refresh_key = f"refresh_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        if st.button("🔄 Get New Recommendations", key=refresh_key):
+            if category_type == 'mood':
+                new_recs = bot.get_fresh_recommendations('mood', st.session_state.selected_mood)
+            elif category_type == 'seasonal':
+                new_recs = bot.get_fresh_recommendations('seasonal', st.session_state.selected_seasonal_category)
+            else:
+                new_recs = bot.get_fresh_recommendations('quick', st.session_state.selected_quick_category)
+
+            if new_recs:
+                st.session_state.last_recommendations = new_recs
+                st.session_state.current_page = 0
+                st.rerun()
+
+    # Display recommendations in grid
+    for i in range(0, len(recommendations['recommendations']), 3):
+        cols = st.columns(3)
+        for j, col in enumerate(cols):
+            idx = i + j
+            if idx < len(recommendations['recommendations']):
+                movie = recommendations['recommendations'][idx]
+                with col:
+                    st.subheader(movie['title'])
+                    if movie['info'].get('poster'):
+                        st.image(movie['info']['poster'], width=200)
+
+                    with st.expander("More Info"):
+                        st.write(f"Rating: {movie['info'].get('rating', 'N/A')}")
+                        st.write(movie['info'].get('overview', 'No overview available'))
+
+                    # Single row of buttons
+                    button_cols = st.columns(2)
+                    with button_cols[0]:
+                        if st.button("Not Interested", key=f"not_interested_{idx}_{movie['title']}"):
+                            if 'skipped_movies' not in st.session_state:
+                                st.session_state.skipped_movies = set()
+                            st.session_state.skipped_movies.add(movie['title'])
+                            st.rerun()
+
+                    with button_cols[1]:
+                        if st.button("Add to Watchlist", key=f"watchlist_{idx}_{movie['title']}"):
+                            if add_to_watchlist(movie['title']):
+                                st.success(f"Added {movie['title']} to watchlist!")
+                            else:
+                                st.info("Already in watchlist!")
+
+
+def display_cast(cast, names):
+    """Display cast members"""
+    st.title("Top Cast")
+    if len(cast) >= 6 and len(names) >= 6:
+        # First row
+        cols = st.columns(3)
+        for i in range(3):
+            with cols[i]:
+                st.image(cast[i], width=225, use_column_width=225)
+                st.caption(names[i])
+
+        # Second row
+        cols = st.columns(3)
+        for i in range(3):
+            with cols[i]:
+                st.image(cast[i + 3], width=225, use_column_width=225)
+                st.caption(names[i + 3])
+    else:
+        st.warning("Not enough cast members to display.")
+
+
+def display_reviews(re4view):
+    """Display reviews and sentiment analysis"""
+    if re4view:
+        # Calculate sentiment counts
+        pos_count = sum(1 for sentiment in re4view.values() if sentiment == 'Positive')
+        neg_count = sum(1 for sentiment in re4view.values() if sentiment == 'Negative')
+
+        # Plot sentiment analysis
+        fig, ax = plt.subplots(dpi=50)
+        ax.bar(['Positive', 'Negative'], [pos_count, neg_count])
+        ax.set_title('Sentiment Analysis of Reviews')
+        ax.set_xlabel('Sentiment')
+        ax.set_ylabel('Number of Reviews')
+        st.pyplot(fig)
+
+        # Display reviews table
+        st.write("Reviews:")
+        df = pd.DataFrame.from_dict(re4view, orient='index', columns=['Sentiment'])
+        styled_table = df.style.set_table_styles([
+            {'selector': 'tr', 'props': [('background-color', 'white')]},
+            {'selector': 'th', 'props': [('background-color', 'lightgrey')]},
+            {'selector': 'td', 'props': [('color', 'black')]}
+        ])
+        styled_table.highlight_max(axis=0)
+        st.table(styled_table)
+    else:
+        st.write("No reviews found for this movie.")
+
+@st.cache_resource
+def get_movie_bot():
+    return ComprehensiveMovieBot(movies, similarity)
+
+# Use the cached bot
+bot = get_movie_bot()
+
+# Main UI code
+st.title('Movie Recommendation System')
+
+
+# Show watchlist in sidebar
+display_watchlist()
+
+# Main content
 tab1, tab2, tab3 = st.tabs(["Quick Recommendations", "Seasonal & Special", "Mood Based"])
 
 with tab1:
-    st.markdown("""
-    ### Quick Movie Recommendations
-    Tell me what kind of movies you're looking for:
-    """)
+    if 'quick_input' not in st.session_state:
+        st.session_state.quick_input = ""
 
-    quick_input = st.text_input("What kind of movies would you like?", key="quick_input")
-    selected_quick = st.selectbox("Or choose from common categories:", quick_categories)
+    st.session_state.quick_input = st.text_input("What kind of movies would you like?",
+                                                 value=st.session_state.quick_input)
+    st.session_state.selected_quick_category = st.selectbox("Or choose from common categories:", quick_categories)
 
-    if st.button("Get Quick Recommendations"):
-        search_term = quick_input if quick_input else selected_quick.lower()
-        if search_term:
-            with st.spinner('Finding movies for you...'):
-                bot = ComprehensiveMovieBot(movies, similarity)
-                result = bot.get_recommendations(search_term)  # Removed use_similarity parameter
-                if result and result.get('recommendations'):
-                    display_recommendations(result)
-                else:
-                    st.warning("No recommendations found. Try a different category!")
+    if st.button("Get Quick Recommendations", key="quick_rec_button"):
+        st.session_state.current_tab = 'Quick'
+        st.session_state.recommendation_offset = 0
+        st.session_state.current_page = 0
+        search_term = st.session_state.quick_input if st.session_state.quick_input else st.session_state.selected_quick_category
+        st.session_state.last_recommendation = bot.get_recommendations(search_term.lower())
+
+    if st.session_state.last_recommendation and st.session_state.current_tab == 'Quick':
+        display_recommendations(st.session_state.last_recommendation, 'quick')
 
 with tab2:
-    st.markdown("""
-    ### Category & Special Recommendations
-    Get recommendations by category
-    """)
+    st.session_state.selected_seasonal_category = st.selectbox("Select a category:", season_options)
 
-    selected_category = st.selectbox("Select a category:", season_options)
-    if st.button("Get Category Recommendations"):
-        with st.spinner('Finding seasonal movies...'):
-            bot = ComprehensiveMovieBot(movies, similarity)
-            result = bot.get_recommendations(selected_category.lower())  # Removed use_similarity parameter
-            if result and result.get('recommendations'):
-                display_recommendations(result)
-            else:
-                st.warning("No recommendations found for this category.")
+    if st.button("Get Seasonal Recommendations", key="seasonal_button"):
+        st.session_state.current_tab = 'Seasonal'
+        st.session_state.recommendation_offset = 0
+        st.session_state.current_page = 0
+        season_category = st.session_state.selected_seasonal_category.split()[0].lower()
+        st.session_state.last_recommendation = bot.get_seasonal_recommendations(season_category)
+
+    if st.session_state.last_recommendation and st.session_state.current_tab == 'Seasonal':
+        display_recommendations(st.session_state.last_recommendation, 'seasonal')
 
 with tab3:
-    st.markdown("""
-    ### Mood Based Recommendations
-    How are you feeling today?
-    """)
+    st.session_state.selected_mood = st.selectbox("Select your mood:", mood_options)
 
-    selected_mood = st.selectbox("Select your mood:", mood_options)
-    if st.button("Get Mood Recommendations"):
-        with st.spinner('Finding movies to match your mood...'):
-            bot = ComprehensiveMovieBot(movies, similarity)
-            result = bot.get_recommendations(selected_mood.lower())  # Removed use_similarity parameter
-            if result and result.get('recommendations'):
-                display_recommendations(result)
-            else:
-                st.warning("No recommendations found for this mood.")
+    if st.button("Get Mood Recommendations", key="mood_button"):
+        st.session_state.current_tab = 'Mood'
+        st.session_state.recommendation_offset = 0
+        st.session_state.current_page = 0
+        st.session_state.last_recommendation = bot.get_recommendations(st.session_state.selected_mood.lower())
 
-# Add clear all button
-if st.button("Clear All", key="clear_all"):
-    st.experimental_rerun()
+    if st.session_state.last_recommendation and st.session_state.current_tab == 'Mood':
+        display_recommendations(st.session_state.last_recommendation, 'mood')
+
+# Traditional search functionality
+selected_movie = st.selectbox('Or search for a specific movie:', movies['title'].values)
+
+if st.button('Search', key='main_search_button'):
+    result = recommend(selected_movie)
+
+    if result is None:
+        st.error(
+            "Sorry, the movie you requested is not in our database. Please check the spelling or try with some other movies.")
+    else:
+        # Display movie details
+        name, cast, ans, posters, re4view = display_movie_details(result)
+
+        # Display cast
+        display_cast(cast, name)
+
+        # Display trailer
+        if result[10]:  # trailer_final
+            st.title("Trailer")
+            st.video(f"https://www.youtube.com/watch?v={result[10]}")
+
+        # Display reviews
+        display_reviews(re4view)
+
+# Footer
+st.markdown("---")
+col1, col2 = st.columns([4, 1])
+with col2:
+    if st.button("🔄 Clear All", key="clear_all", use_container_width=True):
+        # Reset all session state
+        for key in ['current_page', 'last_quick_category', 'last_seasonal_category',
+                    'last_mood', 'last_search', 'recommendation_offset', 'skipped_movies']:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.rerun()
