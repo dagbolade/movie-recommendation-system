@@ -346,7 +346,12 @@ def recommend(movie):
 
 movies_dict = pickle.load(open('movies_dict.pkl' , 'rb' ))
 movies = pd.DataFrame(movies_dict)
-similarity = pickle.load(open('similarity.pkl' , 'rb'))
+@st.cache_resource
+def load_similarity():
+    return pickle.load(open('similarity.pkl', 'rb'))
+
+similarity = load_similarity()
+
 
 with open('style.css') as f:
     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
@@ -986,7 +991,7 @@ class ComprehensiveMovieBot:
             season_data = self.seasonal_mappings[season.lower()]
             required_genres = season_data['genres']
             exclude_genres = season_data.get('exclude_genres', [])
-            min_rating = 7.0  # Adjust as needed
+            min_rating = 5.0  # Adjust as needed
 
             # Use the filter to limit the number of movies processed
             filtered_movies_df = self.filter_movies_by_criteria(
@@ -995,14 +1000,11 @@ class ComprehensiveMovieBot:
                 min_rating=min_rating
             )
 
-            # Process only filtered movies for recommendations
             recommendations = []
             for _, movie in filtered_movies_df.iterrows():
                 movie_info = self.get_movie_info(movie.movie_id)
-                if not movie_info:
-                    continue
-
-                if self.check_seasonal_criteria(movie_info, season):
+                # Ensure movie_info and 'genres' exist before accessing
+                if movie_info and 'genres' in movie_info and self.check_seasonal_criteria(movie_info, season):
                     recommendations.append({
                         'title': movie.title,
                         'info': movie_info
@@ -1406,6 +1408,8 @@ def display_recommendations(recommendations, category_type=None):
     with cols[1]:
         refresh_key = f"refresh_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         if st.button("🔄 Get New Recommendations", key=refresh_key):
+            st.session_state.recommendation_offset = (st.session_state.recommendation_offset + 1) % len(
+                st.session_state.last_recommendation['recommendations'])
             if category_type == 'mood':
                 new_recs = bot.get_fresh_recommendations('mood', st.session_state.selected_mood)
             elif category_type == 'seasonal':
@@ -1441,7 +1445,7 @@ def display_recommendations(recommendations, category_type=None):
                             if 'skipped_movies' not in st.session_state:
                                 st.session_state.skipped_movies = set()
                             st.session_state.skipped_movies.add(movie['title'])
-                            st.rerun()
+                            st.rerun()  # Use st.experimental_rerun() to refresh and reflect changes
 
                     with button_cols[1]:
                         if st.button("Add to Watchlist", key=f"watchlist_{idx}_{movie['title']}"):
