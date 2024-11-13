@@ -1,43 +1,220 @@
+:root {
+    --primary-color: #2196F3;
+    --secondary-color: #1976D2;
+    --background-dark: #121212;
+    --card-bg: #1E1E1E;
+    --text-primary: #FFFFFF;
+    --text-secondary: #B0B0B0;
+    --success-color: #4CAF50;
+    --error-color: #F44336;
+}
+
+body {
+    background-color: var(--background-dark);
+    color: var(--text-primary);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Navigation */
+.navbar {
+    background-color: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 1rem 0;
+}
+
+.navbar-brand {
+    color: var(--primary-color);
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+.nav-link {
+    color: var(--text-secondary);
+    transition: color 0.3s ease;
+}
+
+.nav-link:hover {
+    color: var(--primary-color);
+}
+
+/* Hero Section */
+.hero-section {
+    padding: 4rem 0;
+    margin-bottom: 2rem;
+}
+
+.hero-section h1 {
+    font-size: 3rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+}
+
+.hero-section .lead {
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+}
+
+/* Custom Tabs */
+.custom-tabs {
+    border: none;
+    margin-bottom: 2rem;
+    justify-content: center;
+}
+
+.custom-tabs .nav-link {
+    color: var(--text-secondary);
+    border: none;
+    border-radius: 20px;
+    padding: 0.75rem 1.5rem;
+    margin: 0 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.custom-tabs .nav-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.custom-tabs .nav-link.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* Form Elements */
+.form-select {
+    background-color: var(--card-bg);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(33, 150, 243, 0.25);
+}
+
+.btn-recommend {
+    background: var(--primary-color);
+    border: none;
+    border-radius: 10px;
+    padding: 1rem 2rem;
+    font-weight: 500;
+    width: 100%;
+    transition: all 0.3s ease;
+}
+
+.btn-recommend:hover {
+    background: var(--secondary-color);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(33, 150, 243, 0.3);
+}
+
+/* Movie Cards */
 .movie-card {
-    transition: transform 0.2s;
-    margin-bottom: 20px;
+    background: var(--card-bg);
+    border: none;
+    border-radius: 15px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    height: 100%;
 }
 
 .movie-card:hover {
-    transform: scale(1.02);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-10px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
 }
 
-.card-img-top {
+.movie-card img {
     height: 400px;
     object-fit: cover;
+    width: 100%;
 }
 
-.refresh-btn {
-    margin: 20px 0;
+.movie-card .card-body {
+    padding: 1.5rem;
 }
 
-.nav-tabs {
-    margin-bottom: 20px;
+.movie-card .card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
 }
 
-.tab-content {
-    padding: 20px 0;
+.movie-card .card-text {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
 }
 
-.loading {
-    text-align: center;
-    padding: 20px;
+/* Loading Spinner */
+.spinner-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
 }
 
-.error-message {
-    color: red;
-    text-align: center;
-    padding: 10px;
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
 }
 
-.success-message {
-    color: green;
-    text-align: center;
-    padding: 10px;
+/* Recommendations Container */
+.recommendations-container {
+    margin-top: 2rem;
+    gap: 1.5rem;
+}
+
+/* Refresh Button */
+.refresh-container {
+    margin: 2rem 0;
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+/* Footer */
+.footer {
+    margin-top: auto;
+    padding: 2rem 0;
+    background-color: var(--card-bg);
+}
+
+.footer p {
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+/* Animations */
+.animate__animated {
+    animation-duration: 0.8s;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .hero-section h1 {
+        font-size: 2rem;
+    }
+
+    .custom-tabs .nav-link {
+        padding: 0.5rem 1rem;
+        margin: 0 0.25rem;
+    }
+
+    .movie-card img {
+        height: 300px;
+    }
 }

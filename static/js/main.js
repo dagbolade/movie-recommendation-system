@@ -3,29 +3,40 @@ let currentOffset = 0;
 let currentType = 'similar';
 let currentSelection = null;
 
-// Helper function to show loading state
-function showLoading() {
-    const container = document.getElementById('recommendationsContainer');
-    container.innerHTML = '<div class="loading">Loading recommendations...</div>';
+// Show/hide loading spinner
+function toggleLoading(show) {
+    document.getElementById('loadingSpinner').style.display = show ? 'block' : 'none';
 }
 
-// Helper function to show error
+// Show error message
 function showError(message) {
     const container = document.getElementById('recommendationsContainer');
-    container.innerHTML = `<div class="error-message">${message}</div>`;
+    container.innerHTML = `
+        <div class="col-12 text-center">
+            <div class="alert alert-danger" role="alert">
+                ${message}
+            </div>
+        </div>
+    `;
 }
 
-// Helper function to display recommendations
+// Display recommendations
 function displayRecommendations(recommendations) {
     const container = document.getElementById('recommendationsContainer');
     container.innerHTML = '';
 
     if (!recommendations || recommendations.length === 0) {
-        container.innerHTML = '<p class="text-center">No recommendations found</p>';
+        container.innerHTML = `
+            <div class="col-12 text-center">
+                <div class="alert alert-info" role="alert">
+                    No recommendations found. Try another selection!
+                </div>
+            </div>
+        `;
         return;
     }
 
-    recommendations.forEach(movie => {
+    recommendations.forEach((movie, index) => {
         const movieCard = document.createElement('div');
         movieCard.className = 'col-md-4 mb-4';
         const posterUrl = movie.info.basic_info.poster_path ?
@@ -33,18 +44,18 @@ function displayRecommendations(recommendations) {
             '/static/images/no-poster.jpg';
 
         movieCard.innerHTML = `
-            <div class="card movie-card">
+            <div class="movie-card animate__animated animate__fadeIn" style="animation-delay: ${index * 0.1}s">
                 <img src="${posterUrl}" 
                      class="card-img-top" 
                      alt="${movie.title}"
                      onerror="this.src='/static/images/no-poster.jpg'">
                 <div class="card-body">
                     <h5 class="card-title">${movie.title}</h5>
-                    <p class="card-text">Rating: ${movie.info.basic_info.vote_average}</p>
+                    <p class="card-text">Rating: ${movie.info.basic_info.vote_average}/10</p>
                     <div class="d-flex justify-content-between">
-                        <button class="btn btn-sm btn-primary view-details" 
-                                data-movie="${movie.title}">View Details</button>
-                        <button class="btn btn-sm btn-outline-primary add-watchlist" 
+                        <a href="/movie_details/${encodeURIComponent(movie.title)}" 
+                           class="btn btn-primary btn-sm">View Details</a>
+                        <button class="btn btn-outline-primary btn-sm add-to-watchlist" 
                                 data-movie="${movie.title}">Add to Watchlist</button>
                     </div>
                 </div>
@@ -54,13 +65,13 @@ function displayRecommendations(recommendations) {
     });
 
     // Show refresh button
-    document.querySelector('.refresh-btn').style.display = 'block';
+    document.querySelector('.refresh-container').style.display = 'block';
 }
 
-// Function to get recommendations
+// Get recommendations
 async function getRecommendations(type, selection) {
     try {
-        showLoading();
+        toggleLoading(true);
 
         const response = await fetch('/get_recommendations', {
             method: 'POST',
@@ -76,87 +87,74 @@ async function getRecommendations(type, selection) {
             })
         });
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
         const data = await response.json();
-        if (data.error) {
-            showError(data.error);
-            return;
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Error getting recommendations');
         }
 
+        currentType = type;
+        currentSelection = selection;
         displayRecommendations(data.recommendations);
-        document.querySelector('.refresh-btn').style.display = 'block';
 
     } catch (error) {
         console.error('Error:', error);
-        showError('Error getting recommendations. Please try again.');
+        showError(error.message || 'Error getting recommendations. Please try again.');
+    } finally {
+        toggleLoading(false);
     }
 }
 
-// Event listeners
+// Event Listeners
 document.addEventListener('DOMContentLoaded', function() {
-    // Similar movies recommendations
-    document.getElementById('getRecommendations').addEventListener('click', () => {
+    // Movie Search
+    document.getElementById('getRecommendations')?.addEventListener('click', () => {
         const movieTitle = document.getElementById('movieSelect').value;
         if (!movieTitle) {
             showError('Please select a movie first');
             return;
         }
-        currentType = 'similar';
-        currentSelection = movieTitle;
+        currentOffset = 0;
         getRecommendations('similar', movieTitle);
     });
 
-    // Mood based recommendations
-    document.getElementById('getMoodRecommendations').addEventListener('click', () => {
+    // Mood Based
+    document.getElementById('getMoodRecommendations')?.addEventListener('click', () => {
         const mood = document.getElementById('moodSelect').value;
         if (!mood) {
             showError('Please select a mood first');
             return;
         }
-        currentType = 'mood';
-        currentSelection = mood;
+        currentOffset = 0;
         getRecommendations('mood', mood);
     });
 
-    // Seasonal recommendations
-    document.getElementById('getSeasonalRecommendations').addEventListener('click', () => {
+    // Seasonal
+    document.getElementById('getSeasonalRecommendations')?.addEventListener('click', () => {
         const season = document.getElementById('seasonSelect').value;
         if (!season) {
             showError('Please select a season first');
             return;
         }
-        currentType = 'seasonal';
-        currentSelection = season;
+        currentOffset = 0;
         getRecommendations('seasonal', season);
     });
 
     // Refresh recommendations
-    document.getElementById('refreshRecommendations').addEventListener('click', () => {
-        currentOffset += 6;  // Increment offset
+    document.getElementById('refreshRecommendations')?.addEventListener('click', () => {
+        currentOffset += 6;
         getRecommendations(currentType, currentSelection);
     });
 
-    // View details buttons
+    // Watchlist functionality
     document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('view-details')) {
-            const movieTitle = e.target.dataset.movie;
-            window.location.href = `/movie_details/${encodeURIComponent(movieTitle)}`;
-        }
-    });
-
-    // Add to watchlist buttons
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('add-watchlist')) {
-            const movieTitle = e.target.dataset.movie;
-            addToWatchlist(movieTitle);
+        if (e.target.classList.contains('add-to-watchlist')) {
+            addToWatchlist(e.target.dataset.movie);
         }
     });
 });
 
-// Function to add movie to watchlist
+// Add to watchlist
 async function addToWatchlist(movieTitle) {
     try {
         const response = await fetch('/add_to_watchlist', {
@@ -170,10 +168,30 @@ async function addToWatchlist(movieTitle) {
         });
 
         const data = await response.json();
-        alert(data.message);
 
+        if (response.ok) {
+            // Show success message
+            const toast = document.createElement('div');
+            toast.className = 'toast show position-fixed bottom-0 end-0 m-3';
+            toast.setAttribute('role', 'alert');
+            toast.innerHTML = `
+                <div class="toast-header">
+                    <strong class="me-auto">Success</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+                </div>
+                <div class="toast-body">
+                    ${data.message}
+                </div>
+            `;
+            document.body.appendChild(toast);
+
+            // Remove toast after 3 seconds
+            setTimeout(() => toast.remove(), 3000);
+        } else {
+            throw new Error(data.error || 'Error adding to watchlist');
+        }
     } catch (error) {
         console.error('Error:', error);
-        alert('Error adding movie to watchlist');
+        alert(error.message || 'Error adding to watchlist');
     }
 }
