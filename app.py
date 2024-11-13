@@ -13,7 +13,7 @@ from collections import Counter
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# Load all models and data
+# Load models and data
 movies_dict = pickle.load(open('movies_dict.pkl', 'rb'))
 movies = pd.DataFrame(movies_dict)
 similarity = pickle.load(open('similarity.pkl', 'rb'))
@@ -22,8 +22,9 @@ vectorizer = pickle.load(open('vectorizer.pkl', 'rb'))
 
 # Constants
 TMDB_API_KEY = "4158f8d4403c843543d3dc953f225d77"
+WATCHLIST_FILE = 'watchlist.json'
 
-# Category definitions
+# Mood and seasonal categories
 MOOD_CATEGORIES = {
     'happy': ['Comedy', 'Animation', 'Family'],
     'sad': ['Drama', 'Romance'],
@@ -52,12 +53,15 @@ SEASONAL_CATEGORIES = {
     }
 }
 
+# Initialize watchlist file
+if not os.path.exists(WATCHLIST_FILE):
+    with open(WATCHLIST_FILE, 'w') as f:
+        json.dump([], f)
 
-# API Helper functions
+
 def get_movie_details(movie_id):
     """Get comprehensive movie details including crew, reviews, and trailers"""
     try:
-        # Basic movie info
         response = requests.get(
             f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={TMDB_API_KEY}&language=en-US")
         if response.status_code != 200:
@@ -116,7 +120,6 @@ def get_trailer(movie_id):
             f"https://api.themoviedb.org/3/movie/{movie_id}/videos?api_key={TMDB_API_KEY}")
         data = response.json()
         if response.status_code == 200 and data.get('results'):
-            # Find YouTube trailer
             for video in data['results']:
                 if video['site'] == 'YouTube' and video['type'] == 'Trailer':
                     return video['key']
@@ -138,7 +141,6 @@ def get_reviews_with_sentiment(movie_id):
             for review in data['results'][:5]:  # Limit to 5 reviews
                 review_text = review.get('content', '')
                 if review_text:
-                    # Analyze sentiment using loaded model
                     sentiment = analyze_sentiment(review_text)
                     reviews.append({
                         'text': review_text,
@@ -151,11 +153,9 @@ def get_reviews_with_sentiment(movie_id):
 
 
 def analyze_sentiment(text):
-    """Analyze sentiment of text using loaded model"""
+    """Analyze sentiment of text"""
     try:
-        # Transform text using loaded vectorizer
         vector = vectorizer.transform([text])
-        # Predict sentiment using loaded model
         prediction = clf.predict(vector)
         return 'Positive' if prediction[0] else 'Negative'
     except Exception as e:
@@ -163,15 +163,37 @@ def analyze_sentiment(text):
         return 'Unknown'
 
 
+def load_watchlist():
+    """Load watchlist from JSON file"""
+    try:
+        if os.path.exists(WATCHLIST_FILE):
+            with open(WATCHLIST_FILE, 'r') as f:
+                return json.load(f)
+        return []
+    except Exception as e:
+        print(f"Error loading watchlist: {str(e)}")
+        return []
+
+
+def save_watchlist(watchlist):
+    """Save watchlist to JSON file"""
+    try:
+        with open(WATCHLIST_FILE, 'w') as f:
+            json.dump(watchlist, f)
+        return True
+    except Exception as e:
+        print(f"Error saving watchlist: {str(e)}")
+        return False
+
+
 def get_similar_recommendations(movie_title, offset=0):
-    """Get similar movie recommendations based on content similarity"""
+    """Get similar movie recommendations"""
     try:
         movie_index = movies[movies['title'] == movie_title].index[0]
         distances = similarity[movie_index]
         movies_list = sorted(list(enumerate(distances)), reverse=True, key=lambda x: x[1])
 
-        # Apply offset and exclude the movie itself
-        start_idx = (offset % (len(movies_list) - 1)) + 1  # +1 to skip the movie itself
+        start_idx = (offset % (len(movies_list) - 1)) + 1
         movies_list = movies_list[start_idx:start_idx + 6]
 
         recommendations = []
@@ -191,7 +213,7 @@ def get_similar_recommendations(movie_title, offset=0):
 
 
 def get_mood_recommendations(mood, offset=0):
-    """Get recommendations based on user's mood"""
+    """Get mood-based recommendations"""
     try:
         if mood not in MOOD_CATEGORIES:
             return []
@@ -200,14 +222,12 @@ def get_mood_recommendations(mood, offset=0):
         recommendations = []
         movies_processed = 0
 
-        # Start from offset
         for _, movie in movies.iloc[offset:].iterrows():
             try:
                 movie_info = get_movie_details(int(movie.movie_id))
                 if not movie_info:
                     continue
 
-                # Check if movie genres match mood
                 movie_genres = [g['name'] for g in movie_info['basic_info'].get('genres', [])]
                 if any(genre in preferred_genres for genre in movie_genres):
                     recommendations.append({
@@ -220,7 +240,6 @@ def get_mood_recommendations(mood, offset=0):
                     break
 
             except Exception as e:
-                print(f"Error processing movie {movie.title}: {str(e)}")
                 continue
 
         return recommendations
@@ -230,7 +249,7 @@ def get_mood_recommendations(mood, offset=0):
 
 
 def get_seasonal_recommendations(season, offset=0):
-    """Get recommendations based on season/holiday"""
+    """Get seasonal recommendations"""
     try:
         if season not in SEASONAL_CATEGORIES:
             return []
@@ -239,20 +258,15 @@ def get_seasonal_recommendations(season, offset=0):
         recommendations = []
         movies_processed = 0
 
-        # Start from offset
         for _, movie in movies.iloc[offset:].iterrows():
             try:
                 movie_info = get_movie_details(int(movie.movie_id))
                 if not movie_info:
                     continue
 
-                # Check if movie matches seasonal criteria
                 movie_genres = [g['name'] for g in movie_info['basic_info'].get('genres', [])]
 
-                # Check required genres
                 has_required_genre = any(genre in criteria['genres'] for genre in movie_genres)
-
-                # Check excluded genres
                 no_excluded_genre = not any(genre in criteria.get('exclude_genres', [])
                                             for genre in movie_genres)
 
@@ -267,7 +281,6 @@ def get_seasonal_recommendations(season, offset=0):
                     break
 
             except Exception as e:
-                print(f"Error processing movie {movie.title}: {str(e)}")
                 continue
 
         return recommendations
@@ -276,25 +289,10 @@ def get_seasonal_recommendations(season, offset=0):
         return []
 
 
-# Custom JSON encoder for NumPy types
-class CustomJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        try:
-            if isinstance(obj, np.integer):
-                return int(obj)
-            elif isinstance(obj, np.floating):
-                return float(obj)
-            elif isinstance(obj, np.ndarray):
-                return obj.tolist()
-            return super().default(obj)
-        except Exception as e:
-            print(f"Error in JSON encoding: {str(e)}")
-            return str(obj)
-
 # Routes
 @app.route('/')
 def home():
-    """Home page with all recommendation options"""
+    """Home page"""
     return render_template('index.html',
                            movies=movies['title'].values.tolist(),
                            moods=list(MOOD_CATEGORIES.keys()),
@@ -303,7 +301,7 @@ def home():
 
 @app.route('/movie_details/<movie_title>')
 def movie_details(movie_title):
-    """Detailed movie page with all information"""
+    """Movie details page"""
     try:
         movie = movies[movies['title'] == movie_title].iloc[0]
         details = get_movie_details(movie.movie_id)
@@ -318,7 +316,7 @@ def movie_details(movie_title):
 
 @app.route('/get_recommendations', methods=['POST'])
 def get_recommendations():
-    """Get movie recommendations based on type"""
+    """Get movie recommendations"""
     try:
         data = request.get_json()
         rec_type = data.get('type', 'similar')
@@ -351,5 +349,77 @@ def get_recommendations():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/watchlist')
+def view_watchlist():
+    """View watchlist page"""
+    try:
+        watchlist = load_watchlist()
+        watchlist_movies = []
+
+        for movie_title in watchlist:
+            try:
+                movie = movies[movies['title'] == movie_title].iloc[0]
+                movie_info = get_movie_details(int(movie.movie_id))
+                if movie_info:
+                    watchlist_movies.append({
+                        'title': movie_title,
+                        'info': movie_info
+                    })
+            except Exception as e:
+                continue
+
+        return render_template('watchlist.html', movies=watchlist_movies)
+    except Exception as e:
+        return render_template('watchlist.html', movies=[], error=str(e))
+
+
+@app.route('/add_to_watchlist', methods=['POST'])
+def add_to_watchlist():
+    """Add movie to watchlist"""
+    try:
+        data = request.get_json()
+        movie_title = data.get('movie')
+
+        if not movie_title:
+            return jsonify({'error': 'No movie title provided'}), 400
+
+        watchlist = load_watchlist()
+        if movie_title in watchlist:
+            return jsonify({'message': 'Movie already in watchlist'}), 200
+
+        watchlist.append(movie_title)
+        if save_watchlist(watchlist):
+            return jsonify({'message': 'Added to watchlist successfully'}), 200
+        else:
+            return jsonify({'error': 'Error saving to watchlist'}), 500
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/remove_from_watchlist', methods=['POST'])
+def remove_from_watchlist():
+    """Remove movie from watchlist"""
+    try:
+        data = request.get_json()
+        movie_title = data.get('movie')
+
+        if not movie_title:
+            return jsonify({'error': 'No movie title provided'}), 400
+
+        watchlist = load_watchlist()
+        if movie_title in watchlist:
+            watchlist.remove(movie_title)
+            if save_watchlist(watchlist):
+                return jsonify({'message': 'Removed from watchlist'}), 200
+            else:
+                return jsonify({'error': 'Error saving watchlist'}), 500
+
+        return jsonify({'message': 'Movie not in watchlist'}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5000)

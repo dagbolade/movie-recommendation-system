@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Watchlist</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .movie-card {
+            margin-bottom: 20px;
+            transition: transform 0.2s;
+        }
+        .movie-card:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .movie-poster {
+            height: 400px;
+            object-fit: cover;
+        }
+        .empty-watchlist {
+            text-align: center;
+            padding: 50px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <!-- Navigation -->
+        <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/">Movie Recommender</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/">Home</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/watchlist">Watchlist</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Watchlist Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>My Watchlist</h1>
+            <a href="/" class="btn btn-primary">Find More Movies</a>
+        </div>
+
+        <!-- Watchlist Content -->
+        {% if movies %}
+            <div class="row">
+                {% for movie in movies %}
+                    <div class="col-md-4 mb-4">
+                        <div class="card movie-card">
+                            {% if movie.info.basic_info.poster_path %}
+                                <img src="https://image.tmdb.org/t/p/w500{{ movie.info.basic_info.poster_path }}"
+                                     class="card-img-top movie-poster"
+                                     alt="{{ movie.title }}">
+                            {% else %}
+                                <img src="{{ url_for('static', filename='images/no-poster.jpg') }}"
+                                     class="card-img-top movie-poster"
+                                     alt="No poster available">
+                            {% endif %}
+                            <div class="card-body">
+                                <h5 class="card-title">{{ movie.title }}</h5>
+                                {% if movie.info.basic_info.vote_average %}
+                                    <p class="card-text">
+                                        <strong>Rating:</strong> {{ movie.info.basic_info.vote_average }}/10
+                                    </p>
+                                {% endif %}
+                                {% if movie.info.basic_info.release_date %}
+                                    <p class="card-text">
+                                        <strong>Release Date:</strong> {{ movie.info.basic_info.release_date }}
+                                    </p>
+                                {% endif %}
+                                <div class="d-flex justify-content-between mt-3">
+                                    <a href="/movie_details/{{ movie.title|urlencode }}"
+                                       class="btn btn-primary btn-sm">View Details</a>
+                                    <button class="btn btn-danger btn-sm remove-from-watchlist"
+                                            data-movie="{{ movie.title }}">
+                                        Remove
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-watchlist">
+                <h3>Your watchlist is empty</h3>
+                <p class="text-muted">Start adding movies to your watchlist to see them here!</p>
+                <a href="/" class="btn btn-primary mt-3">Browse Movies</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Bootstrap and custom scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Remove from watchlist functionality
+            document.querySelectorAll('.remove-from-watchlist').forEach(button => {
+                button.addEventListener('click', async function() {
+                    const movieTitle = this.dataset.movie;
+                    try {
+                        const response = await fetch('/remove_from_watchlist', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                movie: movieTitle
+                            })
+                        });
+
+                        const data = await response.json();
+                        if (response.ok) {
+                            alert(data.message);
+                            // Reload the page to update the watchlist
+                            window.location.reload();
+                        } else {
+                            throw new Error(data.error || 'Error removing movie from watchlist');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert(error.message || 'Error removing movie from watchlist');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

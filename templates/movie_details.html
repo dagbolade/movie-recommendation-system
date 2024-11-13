@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ movie.title }} - Movie Details</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .movie-header {
+            min-height: 500px;
+            position: relative;
+            background: linear-gradient(to bottom, rgba(18, 18, 18, 0.7), var(--background-dark)),
+                        url('https://image.tmdb.org/t/p/original{{ details.basic_info.backdrop_path }}') center/cover;
+            padding: 4rem 0;
+            margin-bottom: 3rem;
+        }
+
+        .movie-poster {
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .cast-image {
+            width: 150px;
+            height: 225px;
+            object-fit: cover;
+            border-radius: 10px;
+            transition: transform 0.3s ease;
+        }
+
+        .cast-image:hover {
+            transform: scale(1.05);
+        }
+
+        .trailer-container {
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+            overflow: hidden;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .trailer-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .review-card {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+
+        .review-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .sentiment-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        .sentiment-positive {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+        }
+
+        .sentiment-negative {
+            background: rgba(244, 67, 54, 0.2);
+            color: #F44336;
+        }
+
+        .genre-badge {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg">
+        <div class="container">
+            <a class="navbar-brand" href="/">MovieMate</a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/watchlist">My Watchlist</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Movie Header -->
+    <div class="movie-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-4 animate__animated animate__fadeInLeft">
+                    <img src="https://image.tmdb.org/t/p/w500{{ details.basic_info.poster_path }}"
+                         class="img-fluid movie-poster"
+                         alt="{{ movie.title }}">
+                </div>
+                <div class="col-md-8 animate__animated animate__fadeInRight">
+                    <h1 class="display-4 mb-3">{{ movie.title }}</h1>
+                    <p class="lead">{{ details.basic_info.overview }}</p>
+                    <div class="mt-4">
+                        {% for genre in details.basic_info.genres %}
+                            <span class="genre-badge">{{ genre.name }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-4">
+                        <p><strong>Release Date:</strong> {{ details.basic_info.release_date }}</p>
+                        <p><strong>Rating:</strong> {{ details.basic_info.vote_average }}/10</p>
+                    </div>
+                    <button class="btn btn-primary mt-3 add-to-watchlist"
+                            data-movie="{{ movie.title }}">
+                        Add to Watchlist
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Trailer Section -->
+        {% if details.trailer %}
+        <section class="mb-5 animate__animated animate__fadeIn">
+            <h2 class="mb-4">Trailer</h2>
+            <div class="trailer-container">
+                <iframe src="https://www.youtube.com/embed/{{ details.trailer }}"
+                        frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowfullscreen>
+                </iframe>
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- Cast Section -->
+        {% if details.crew_names %}
+        <section class="mb-5 animate__animated animate__fadeIn">
+            <h2 class="mb-4">Cast</h2>
+            <div class="row">
+                {% for i in range(details.crew_names|length) %}
+                <div class="col-md-2 col-6 mb-4 text-center">
+                    <img src="{{ details.crew_images[i] }}"
+                         class="cast-image mb-2"
+                         alt="{{ details.crew_names[i] }}">
+                    <p class="mb-0">{{ details.crew_names[i] }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- Reviews Section -->
+        {% if details.reviews %}
+        <section class="mb-5 animate__animated animate__fadeIn">
+            <h2 class="mb-4">Reviews</h2>
+            <!-- Sentiment Summary -->
+            <div class="sentiment-summary mb-4">
+                {% set positive_count = details.reviews|selectattr("sentiment", "equalto", "Positive")|list|length %}
+                {% set total_reviews = details.reviews|length %}
+                <div class="progress" style="height: 30px;">
+                    <div class="progress-bar bg-success"
+                         role="progressbar"
+                         style="width: {{ (positive_count/total_reviews * 100)|round }}%">
+                        {{ positive_count }} Positive
+                    </div>
+                    <div class="progress-bar bg-danger"
+                         role="progressbar"
+                         style="width: {{ ((total_reviews - positive_count)/total_reviews * 100)|round }}%">
+                        {{ total_reviews - positive_count }} Negative
+                    </div>
+                </div>
+            </div>
+            <!-- Individual Reviews -->
+            {% for review in details.reviews %}
+            <div class="review-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">User Review</h5>
+                    <span class="sentiment-badge {% if review.sentiment == 'Positive' %}sentiment-positive{% else %}sentiment-negative{% endif %}">
+                        {{ review.sentiment }}
+                    </span>
+                </div>
+                <p class="review-text mb-0">{{ review.text|truncate(500) }}</p>
+            </div>
+            {% endfor %}
+        </section>
+        {% endif %}
+    </div>
+
+    <footer class="footer">
+        <div class="container text-center">
+            <p>MovieMate © 2024 | Made with ❤️ for movie lovers</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://kit.fontawesome.com/your-fontawesome-kit.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
