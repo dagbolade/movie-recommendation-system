@@ -420,6 +420,15 @@ def remove_from_watchlist():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# In your app.py
+@app.errorhandler(500)
+def internal_error(error):
+    return render_template('error.html', error="Internal Server Error"), 500
+
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template('error.html', error="Page Not Found"), 404
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
