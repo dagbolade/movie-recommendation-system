@@ -8,6 +8,12 @@ function toggleLoading(show) {
     document.getElementById('loadingSpinner').style.display = show ? 'block' : 'none';
 }
 
+
+function handleImageError(img) {
+    img.onerror = null;  // Prevent infinite loop
+    img.src = '/static/images/no-poster.jpg';
+}
+
 // Show error message
 function showError(message) {
     const container = document.getElementById('recommendationsContainer');
