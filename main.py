@@ -19,9 +19,6 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="Recommender system", layout="wide")
 
-# Initialize ALL session states at the very top of your code
-if 'current_page' not in st.session_state:
-    st.session_state.current_page = 0
 if 'watchlist' not in st.session_state:
     st.session_state.watchlist = []
 if 'skipped_movies' not in st.session_state:
@@ -36,7 +33,8 @@ if 'last_recommendation' not in st.session_state:
     st.session_state.last_recommendation = None
 if 'selected_movie' not in st.session_state:
     st.session_state.selected_movie = None
-
+if 'movie_info_cache' not in st.session_state:
+    st.session_state.movie_info_cache = {}
 
 # add styling
 with open('style.css') as f:
@@ -759,22 +757,39 @@ class ComprehensiveMovieBot:
         }
 
     def get_movie_info(self, movie_id):
-        """Get movie information with caching to reduce repetitive fetches."""
-        if movie_id in self.movie_info_cache:
-            return self.movie_info_cache[movie_id]  # Use cached data
-
+        """Get movie information with proper genre handling and error checking"""
         try:
-            # Fetch movie information and store in cache
+            # Make a single API call to get most of the data
+            response = requests.get(
+                f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=4158f8d4403c843543d3dc953f225d77&language=en-US")
+            if response.status_code != 200:
+                return None
+
+            data = response.json()
+
+            # Safely handle genres - ensure it's always a list
+            movie_genres = []
+            if data.get('genres') and isinstance(data['genres'], list):
+                movie_genres = data['genres']
+
+            # Get crew info separately
+            crew_names, crew_images = crew(movie_id)
+            trailer_key = trailer(movie_id)
+
             movie_info = {
                 'movie_id': movie_id,
-                'genres': genres(movie_id) or [],
-                'rating': rating(movie_id) or 0.0,
-                'poster': poster(movie_id) or "",
-                'overview': overview(movie_id) or "No overview available",
-                'release_date': date(movie_id) or "Release date not available",
-                'trailer': trailer(movie_id) or ""
+                'genres': movie_genres,  # Now guaranteed to be a list
+                'rating': float(data.get('vote_average', 0)),
+                'poster': "https://image.tmdb.org/t/p/w500" + data['poster_path'] if data.get('poster_path') else "",
+                'overview': data.get('overview', "No overview available"),
+                'release_date': data.get('release_date', "Release date not available"),
+                'trailer': trailer_key,
+                'crew_names': crew_names,
+                'crew_images': crew_images
             }
-            self.movie_info_cache[movie_id] = movie_info  # Cache the result
+
+            # Cache the result
+            self.movie_info_cache[movie_id] = movie_info
             return movie_info
 
         except Exception as e:
@@ -791,6 +806,26 @@ class ComprehensiveMovieBot:
             return self.get_seasonal_recommendations(category.lower())
         else:  # Quick categories
             return self.get_recommendations(category.lower())
+
+    # Add a new function to refresh recommendations
+    def refresh_recommendations(self, category_type, category=None):
+        """Get fresh recommendations based on current offset."""
+        try:
+            # Increment offset
+            current_offset = st.session_state.get('recommendation_offset', 0)
+            new_offset = (current_offset + 5) % len(self.movies_df)
+            st.session_state['recommendation_offset'] = new_offset
+
+            if category_type == 'seasonal':
+                return self.get_seasonal_recommendations(category)
+            elif category_type == 'mood':
+                return self.get_recommendations(category)
+            else:
+                return self.get_recommendations(category)
+
+        except Exception as e:
+            print(f"Error refreshing recommendations: {str(e)}")
+            return None
 
 
     def get_recommendations_with_offset(self, category_type, category=None, offset=0):
@@ -982,57 +1017,97 @@ class ComprehensiveMovieBot:
         return recommendations
 
     def get_seasonal_recommendations(self, season, page=0, page_size=5):
-        """Get recommendations for seasonal movies with pagination."""
+        """Get recommendations for seasonal movies with improved genre handling"""
         try:
             if season.lower() not in self.seasonal_mappings:
                 return None
 
-            # Retrieve season-specific criteria
+            # Get season criteria
             season_data = self.seasonal_mappings[season.lower()]
             required_genres = season_data['genres']
             exclude_genres = season_data.get('exclude_genres', [])
-            min_rating = 5.0  # Adjust as needed
-
-            # Use the filter to limit the number of movies processed
-            filtered_movies_df = self.filter_movies_by_criteria(
-                required_genres=required_genres,
-                exclude_genres=exclude_genres,
-                min_rating=min_rating
-            )
-
             recommendations = []
-            for _, movie in filtered_movies_df.iterrows():
-                movie_info = self.get_movie_info(movie.movie_id)
-                # Ensure movie_info and 'genres' exist before accessing
-                if movie_info and 'genres' in movie_info and self.check_seasonal_criteria(movie_info, season):
-                    recommendations.append({
-                        'title': movie.title,
-                        'info': movie_info
-                    })
 
-            recommendations = sorted(
-                recommendations,
-                key=lambda x: float(x['info']['rating']) if isinstance(x['info']['rating'], (int, float)) else 0,
-                reverse=True
-            )
+            # Get current offset from session state
+            start_idx = st.session_state.get('recommendation_offset', 0)
+            movies_processed = 0
+            skipped_movies = st.session_state.get('skipped_movies', set())
 
-            # Paginate
-            start_idx = page * page_size
-            end_idx = start_idx + page_size
-            page_recommendations = recommendations[start_idx:end_idx]
+            # Process movies starting from offset
+            for _, movie in self.movies_df.iloc[start_idx:].iterrows():
+                try:
+                    # Skip if movie is in skipped list
+                    if movie.title in skipped_movies:
+                        continue
+
+                    movie_info = self.get_movie_info(movie.movie_id)
+                    if not movie_info:
+                        continue
+
+                    # Safely get movie genres
+                    movie_genres = []
+                    if movie_info.get('genres'):
+                        movie_genres = [g.get('name', '') for g in movie_info['genres']]
+
+                    # Check if movie matches criteria
+                    if movie_genres and any(genre in required_genres for genre in movie_genres):
+                        # Check excluded genres
+                        if not any(genre in exclude_genres for genre in movie_genres):
+                            recommendations.append({
+                                'title': movie.title,
+                                'info': movie_info
+                            })
+
+                    movies_processed += 1
+
+                    # Break if we have enough recommendations
+                    if len(recommendations) >= page_size:
+                        break
+
+                except Exception as e:
+                    print(f"Error processing movie {movie.title}: {str(e)}")
+                    continue
+
+            # Update offset for next time
+            new_offset = (start_idx + movies_processed) % len(self.movies_df)
+            st.session_state['recommendation_offset'] = new_offset
+
+            # If we don't have enough recommendations, reset offset and try again
+            if len(recommendations) < page_size and movies_processed < len(self.movies_df):
+                st.session_state['recommendation_offset'] = 0
+                return self.get_seasonal_recommendations(season, page, page_size)
 
             return {
                 'type': 'seasonal',
                 'category': season.lower(),
-                'recommendations': page_recommendations,
-                'has_more': end_idx < len(recommendations),
-                'total_pages': (len(recommendations) + page_size - 1) // page_size,
+                'recommendations': recommendations,
+                'has_more': True,
+                'total_pages': (len(self.movies_df) + page_size - 1) // page_size,
                 'current_page': page
             }
 
         except Exception as e:
             print(f"Error in get_seasonal_recommendations: {str(e)}")
-            return None
+            return {
+                'type': 'seasonal',
+                'category': season.lower(),
+                'recommendations': [],
+                'has_more': False,
+                'total_pages': 0,
+                'current_page': 0
+            }
+
+    # Add this helper function to safely process genres
+    def process_genres(self, genre_list):
+        """Safely process genres from API response"""
+        try:
+            if not genre_list or not isinstance(genre_list, list):
+                return []
+
+            return [g.get('name', '') for g in genre_list if isinstance(g, dict) and 'name' in g]
+        except Exception as e:
+            print(f"Error processing genres: {str(e)}")
+            return []
 
     def filter_movies_by_criteria(self, required_genres=None, exclude_genres=None, min_rating=0):
         """Filters movies based on genres and minimum rating."""
@@ -1040,12 +1115,12 @@ class ComprehensiveMovieBot:
 
         if required_genres:
             filtered_df = filtered_df[filtered_df['genres'].apply(
-                lambda genres: any(genre in genres for genre in required_genres)
+                lambda genres: genres and any(genre in genres for genre in required_genres)
             )]
 
         if exclude_genres:
             filtered_df = filtered_df[~filtered_df['genres'].apply(
-                lambda genres: any(genre in genres for genre in exclude_genres)
+                lambda genres: genres and any(genre in genres for genre in exclude_genres)
             )]
 
         if min_rating > 0:
@@ -1398,29 +1473,40 @@ def display_movie_details(movie_data):
 
 
 def display_recommendations(recommendations, category_type=None):
-    """Display recommendations with working buttons"""
+    """Display recommendations with working Streamlit refresh functionality"""
     if not recommendations:
         st.warning("No recommendations found!")
         return
 
-    # Refresh button
+    # Create unique key for refresh button using current time
+    refresh_key = f"refresh_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+    # Refresh button centered
     cols = st.columns([1, 2, 1])
     with cols[1]:
-        refresh_key = f"refresh_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         if st.button("🔄 Get New Recommendations", key=refresh_key):
-            st.session_state.recommendation_offset = (st.session_state.recommendation_offset + 1) % len(
-                st.session_state.last_recommendation['recommendations'])
-            if category_type == 'mood':
-                new_recs = bot.get_fresh_recommendations('mood', st.session_state.selected_mood)
-            elif category_type == 'seasonal':
-                new_recs = bot.get_fresh_recommendations('seasonal', st.session_state.selected_seasonal_category)
-            else:
-                new_recs = bot.get_fresh_recommendations('quick', st.session_state.selected_quick_category)
+            # Update offset in session state
+            if 'recommendation_offset' not in st.session_state:
+                st.session_state.recommendation_offset = 0
 
-            if new_recs:
-                st.session_state.last_recommendations = new_recs
-                st.session_state.current_page = 0
-                st.rerun()
+            # Increment offset
+            current_offset = st.session_state.recommendation_offset
+            st.session_state.recommendation_offset = (current_offset + 5) % len(movies)
+
+            # Get fresh recommendations based on category
+            if category_type == 'mood':
+                st.session_state.last_recommendations = bot.get_recommendations(st.session_state.selected_mood.lower())
+            elif category_type == 'seasonal':
+                season_category = st.session_state.selected_seasonal_category.split()[0].lower()
+                st.session_state.last_recommendations = bot.get_seasonal_recommendations(season_category)
+            else:  # Quick recommendations
+                search_term = (st.session_state.quick_input
+                               if st.session_state.quick_input
+                               else st.session_state.selected_quick_category)
+                st.session_state.last_recommendations = bot.get_recommendations(search_term.lower())
+
+            # Force streamlit to rerun
+            st.rerun()
 
     # Display recommendations in grid
     for i in range(0, len(recommendations['recommendations']), 3):
@@ -1429,6 +1515,11 @@ def display_recommendations(recommendations, category_type=None):
             idx = i + j
             if idx < len(recommendations['recommendations']):
                 movie = recommendations['recommendations'][idx]
+
+                # Skip if movie is in skipped list
+                if movie['title'] in st.session_state.get('skipped_movies', set()):
+                    continue
+
                 with col:
                     st.subheader(movie['title'])
                     if movie['info'].get('poster'):
@@ -1438,17 +1529,19 @@ def display_recommendations(recommendations, category_type=None):
                         st.write(f"Rating: {movie['info'].get('rating', 'N/A')}")
                         st.write(movie['info'].get('overview', 'No overview available'))
 
-                    # Single row of buttons
+                    # Buttons in columns
                     button_cols = st.columns(2)
                     with button_cols[0]:
-                        if st.button("Not Interested", key=f"not_interested_{idx}_{movie['title']}"):
+                        not_interested_key = f"not_interested_{refresh_key}_{idx}"
+                        if st.button("Not Interested", key=not_interested_key):
                             if 'skipped_movies' not in st.session_state:
                                 st.session_state.skipped_movies = set()
                             st.session_state.skipped_movies.add(movie['title'])
-                            st.rerun()  # Use st.experimental_rerun() to refresh and reflect changes
+                            st.rerun()
 
                     with button_cols[1]:
-                        if st.button("Add to Watchlist", key=f"watchlist_{idx}_{movie['title']}"):
+                        watchlist_key = f"watchlist_{refresh_key}_{idx}"
+                        if st.button("Add to Watchlist", key=watchlist_key):
                             if add_to_watchlist(movie['title']):
                                 st.success(f"Added {movie['title']} to watchlist!")
                             else:
@@ -1543,11 +1636,9 @@ with tab2:
     st.session_state.selected_seasonal_category = st.selectbox("Select a category:", season_options)
 
     if st.button("Get Seasonal Recommendations", key="seasonal_button"):
-        st.session_state.current_tab = 'Seasonal'
-        st.session_state.recommendation_offset = 0
-        st.session_state.current_page = 0
+        st.session_state['current_tab'] = 'Seasonal'
         season_category = st.session_state.selected_seasonal_category.split()[0].lower()
-        st.session_state.last_recommendation = bot.get_seasonal_recommendations(season_category)
+        recommendations = bot.get_seasonal_recommendations(season_category)
 
     if st.session_state.last_recommendation and st.session_state.current_tab == 'Seasonal':
         display_recommendations(st.session_state.last_recommendation, 'seasonal')
@@ -1564,29 +1655,6 @@ with tab3:
     if st.session_state.last_recommendation and st.session_state.current_tab == 'Mood':
         display_recommendations(st.session_state.last_recommendation, 'mood')
 
-# Traditional search functionality
-selected_movie = st.selectbox('Or search for a specific movie:', movies['title'].values)
-
-if st.button('Search', key='main_search_button'):
-    result = recommend(selected_movie)
-
-    if result is None:
-        st.error(
-            "Sorry, the movie you requested is not in our database. Please check the spelling or try with some other movies.")
-    else:
-        # Display movie details
-        name, cast, ans, posters, re4view = display_movie_details(result)
-
-        # Display cast
-        display_cast(cast, name)
-
-        # Display trailer
-        if result[10]:  # trailer_final
-            st.title("Trailer")
-            st.video(f"https://www.youtube.com/watch?v={result[10]}")
-
-        # Display reviews
-        display_reviews(re4view)
 
 # Footer
 st.markdown("---")
