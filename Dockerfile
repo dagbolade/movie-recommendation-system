@@ -1,20 +1,31 @@
-# Use a lightweight Python image
-FROM python:3.10-slim
+# First stage: Build dependencies in a lightweight image
+FROM python:3.10-slim AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy dependencies file
+# Copy only requirements to leverage Docker caching
 COPY requirements.txt .
 
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies in a virtual environment
+RUN python -m venv /venv && \
+    /venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the app files
+# Second stage: Create the final lightweight image
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Copy the pre-installed dependencies from builder stage
+COPY --from=builder /venv /venv
+
+# Copy application files
 COPY . .
 
-# Expose the Flask app port
+# Use the pre-installed environment
+ENV PATH="/venv/bin:$PATH"
+
+# Expose port for Render
 EXPOSE 5000
 
-# Run Flask
-CMD ["python", "app.py"]
+# Set default command to run with Gunicorn
+CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
