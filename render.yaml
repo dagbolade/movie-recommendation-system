@@ -3,9 +3,10 @@ services:
     name: movie-recommender
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn app:app --workers=1 --threads=2
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
       - key: TMDB_API_KEY
         sync: false
+
