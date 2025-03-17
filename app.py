@@ -65,7 +65,7 @@ if not os.path.exists(WATCHLIST_FILE):
 
 
 def get_movie_details(movie_id):
-    """Get comprehensive movie details including crew, reviews, and trailers"""
+    """Get comprehensive movie details including creww, reviews, and trailers"""
     try:
         response = requests.get(
             f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={TMDB_API_KEY}&language=en-US")
