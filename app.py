@@ -16,12 +16,7 @@ app.secret_key = os.urandom(24)
 # Load models and data
 movies_dict = pickle.load(open('movies_dict.pkl', 'rb'))
 movies = pd.DataFrame(movies_dict)
-import gzip
-import pickle
-
-with gzip.open('similarity.pkl.gz', 'rb') as f:
-    similarity = pickle.load(f)
-
+similarity = pickle.load(open('similarity.pkl.gz', 'rb'))
 clf = pickle.load(open('model2.pkl', 'rb'))
 vectorizer = pickle.load(open('vectorizer.pkl', 'rb'))
 
@@ -65,7 +60,7 @@ if not os.path.exists(WATCHLIST_FILE):
 
 
 def get_movie_details(movie_id):
-    """Get comprehensive movie details including creww, reviews, and trailers"""
+    """Get comprehensive movie details including crew, reviews, and trailers"""
     try:
         response = requests.get(
             f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={TMDB_API_KEY}&language=en-US")
