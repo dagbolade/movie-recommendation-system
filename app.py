@@ -16,7 +16,7 @@ app.secret_key = os.urandom(24)
 # Load models and data
 movies_dict = pickle.load(open('movies_dict.pkl', 'rb'))
 movies = pd.DataFrame(movies_dict)
-similarity = pickle.load(open('similarity.pkl', 'rb'))
+similarity = pickle.load(open('similarity.pkl.gz', 'rb'))
 clf = pickle.load(open('model2.pkl', 'rb'))
 vectorizer = pickle.load(open('vectorizer.pkl', 'rb'))
 
